@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React from "react";
 
@@ -10,7 +11,7 @@ const Login = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        const response = await fetch('http://localhost:5000/login', {
+        const response = await fetch('http://127.0.0.1:5000/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -54,11 +55,17 @@ const Login = () => {
                 </div>
                 <button
                 type="submit"
-                className="w-full bg-[#29a5a1] text-white py-2 rounded hover:bg-[#3caca8] "
+                className="w-full bg-[#0081a1] text-white py-2 rounded hover:bg-[#3caca8] "
                 >
                     Iniciar Sesion
                 </button>
             </form>
+            <div className="text-center mt-6">
+                <p className="text-gray-700">¿No tienes una cuenta? {' '}</p>
+                <Link href='/pages/register'>
+                    <span className="text-[#0081a1] hover:underline">Registrate</span>
+                </Link>
+            </div>
         </div>
     )
 }

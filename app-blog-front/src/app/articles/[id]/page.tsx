@@ -1,62 +1,589 @@
 "use client";
+import React, { useEffect, useState, use } from "react";
 import { useArticles } from "@/src/context/ArticleProvider";
-import Layout from "../../components/layout";
-import { useEffect, useState } from "react";
 import { Article } from "@/src/types/article";
+import { useAuth } from "@/src/context/AuthProvider";
 
+type CommentItem = {
+  id: number;
+  user: string;
+  userId: number | null;
+  text: string;
+  time: string | null;
+  like?: number;
+  laugh?: number;
+  heart?: number;
+  userReaction?: 'heart' | 'like' | 'laugh' | null;
+};
 
+const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
+  const { fetchArticleById } = useArticles();
+  const { username, userId } = useAuth();
+  const [article, setArticle] = useState<Article | null>(null);
+  const [articleId, setArticleId] = useState<number | null>(null);
 
-const ArticlePage = ({params}: {params: Promise<{ id: string }>}) =>  {
-    const [article, setArticle] = useState<Article | null>(null);
-    const { fetchArticleById } = useArticles()
+  // Next.js puede pasar `params` como una Promise en algunas versiones.
+  // React.use (importado como `use`) permite deshacer la promesa en componentes cliente.
+  // Si `params` viene como Promise, la desenvuelvo; si no, lo uso tal cual.
+  const resolvedParams: any = (params && typeof (params as any).then === "function") ? use(params as any) : params;
 
+  const [pdfSrc, setPdfSrc] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfThumbDataUrl, setPdfThumbDataUrl] = useState<string | null>(null);
+  const [pdfThumbLoading, setPdfThumbLoading] = useState(false);
+  const [pdfThumbError, setPdfThumbError] = useState<string | null>(null);
+  const [pdfThumbComputedUrl, setPdfThumbComputedUrl] = useState<string | null>(null);
 
+  const [videoThumbDataUrl, setVideoThumbDataUrl] = useState<string | null>(null);
+  const [videoThumbLoading, setVideoThumbLoading] = useState(false);
+  const [videoThumbError, setVideoThumbError] = useState(false);
+  const [videoThumbLoadError, setVideoThumbLoadError] = useState(false);
+  const [videoThumbComputedUrl, setVideoThumbComputedUrl] = useState<string | null>(null);
 
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
 
-    useEffect(() => {
-        const loadArticle = async () => {
-            try {
-                const resolvedParams = await params;
-                const articleData = await fetchArticleById(parseInt(resolvedParams.id))
-                setArticle(articleData)
-            } catch (error) {
-                console.error('Error al obtener un artículo:', error)
-                
-            }
+  const [reactions, setReactions] = useState<{ heart: number; like: number; laugh: number }>({ heart: 0, like: 0, laugh: 0 });
+  const [userReaction, setUserReaction] = useState<'heart' | 'like' | 'laugh' | null>(null);
+  const [articlePickerOpen, setArticlePickerOpen] = useState(false);
+  const [openCommentPickerId, setOpenCommentPickerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const id = parseInt(resolvedParams.id);
+        setArticleId(id);
+        const a = await fetchArticleById(id);
+        setArticle(a);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+  }, [resolvedParams?.id, fetchArticleById]);
+
+  // Preparar pdfSrc cuando el artículo tenga `pdf_url`.
+  useEffect(() => {
+    if (!article || !article.pdf_url) {
+      setPdfSrc(null);
+      setPdfError(null);
+      setPdfLoading(false);
+      return;
+    }
+    const prepare = async () => {
+      const src = article.pdf_url as string;
+      setPdfLoading(true);
+      setPdfError(null);
+      try {
+        if (src.startsWith('data:')) {
+          setPdfSrc(src);
+          setPdfLoading(false);
+          return;
         }
-        loadArticle()
-    }, [params, fetchArticleById])
 
+        const prox = `/proxy?url=${encodeURIComponent(src)}`;
+        // Preflight: request small range to verify resource and content-type
+        try {
+          const pre = await fetch(prox, { method: 'GET', headers: { Range: 'bytes=0-1023' } });
+          if (!pre.ok) {
+            console.warn('[pdf preflight] non-ok status', pre.status);
+            setPdfError('El PDF no está accesible (status ' + pre.status + ')');
+            setPdfSrc(null);
+            setPdfLoading(false);
+            return;
+          }
+          const ct = pre.headers.get('content-type') || '';
+          if (!ct.toLowerCase().includes('pdf')) {
+            console.warn('[pdf preflight] content-type not pdf', ct);
+            setPdfError('El recurso no es un PDF válido');
+            setPdfSrc(null);
+            setPdfLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[pdf preflight] fetch error', err);
+          setPdfError('Error accediendo al PDF');
+          setPdfSrc(null);
+          setPdfLoading(false);
+          return;
+        }
 
-    if (!article) {
-        return (
-            <Layout >
-                <p className="text-4xl font-bold mb-6">Cargando artículo...</p>
-            </Layout>
-        );
+        setPdfSrc(prox);
+        setPdfLoading(false);
+      } catch (e) {
+        console.error('Error preparando PDF src', e);
+        setPdfError('No se pudo preparar el PDF');
+        setPdfLoading(false);
+      }
+    };
+    prepare();
+  }, [article]);
+
+  // Generar miniatura para videos (YouTube / Google Drive) cuando carga el artículo
+  useEffect(() => {
+    if (!article || !article.video_url) {
+      setVideoThumbDataUrl(null);
+      setVideoThumbError(false);
+      return;
     }
 
-    return (
-        <Layout >
-            <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md mt-8">
-                {
-                  article.image_url && (
-                    <div className="mb-6">
-                        <img src={article.image_url} alt={article.title} className="w-full h-64 object-cover rounded-lg shadow-md"/>
-                    </div>
-                  )
+    const videoUrl = article.video_url;
+
+    function getYoutubeId(url: string) {
+      const regExp = /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const m = url.match(regExp);
+      return m ? m[1] : null;
+    }
+
+    function getDriveId(url: string) {
+      if (!url) return null;
+      const patterns = [
+        /drive\.google\.com\/file\/d\/([^\/\?&]+)/, // /file/d/ID/view
+        /drive\.google\.com\/open\?id=([^&]+)/,      // open?id=ID
+        /drive\.google\.com\/uc\?(?:export=[^&]+&)?id=([^&]+)/, // uc?id=ID or uc?export=download&id=ID
+        /drive\.google\.com\/a\/[^\/]+\/file\/d\/([^\/\?&]+)/, // /a/domain/file/d/ID
+      ];
+      for (const re of patterns) {
+        const m = url.match(re);
+        if (m && m[1]) return m[1];
+      }
+      // fallback: try to read id= from query string
+      try {
+        const u = new URL(url);
+        const id = u.searchParams.get('id');
+        if (id) return id;
+      } catch (e) {
+        // ignore
+      }
+      return null;
+    }
+
+    function getVideoThumbnail(url: string) {
+      const yt = getYoutubeId(url);
+      if (yt) return `https://img.youtube.com/vi/${yt}/hqdefault.jpg`;
+
+      const d = getDriveId(url);
+      if (d) {
+        // Google Drive thumbnail endpoint; requires that the file is shared as "anyone with the link"
+        return `https://drive.google.com/thumbnail?id=${d}&sz=w800`;
+      }
+
+      return null;
+    }
+
+    const thumb = getVideoThumbnail(videoUrl);
+    setVideoThumbComputedUrl(thumb);
+    if (thumb) {
+      setVideoThumbDataUrl(thumb);
+      setVideoThumbError(false);
+    } else {
+      // no reconocido: usar article.image_url como fallback o marcar error
+      if (article.image_url) {
+        setVideoThumbDataUrl(article.image_url);
+        setVideoThumbError(false);
+      } else {
+        setVideoThumbDataUrl(null);
+        setVideoThumbError(true);
+      }
+    }
+
+  }, [article]);
+
+  // Generar miniatura a partir del primer página del PDF usando PDF.js (cliente)
+  useEffect(() => {
+    if (!article || !article.pdf_url) {
+      setPdfThumbDataUrl(null);
+      setPdfThumbError(null);
+      setPdfThumbLoading(false);
+      return;
+    }
+
+    // Compute quick thumbnail URL for known providers (Google Drive)
+    try {
+      const url = article.pdf_url as string;
+      const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/) || url.match(/[?&]id=([^&]+)/);
+      if (driveMatch && driveMatch[1]) {
+        setPdfThumbComputedUrl(`https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`);
+      } else {
+        setPdfThumbComputedUrl(null);
+      }
+    } catch (e) {
+      setPdfThumbComputedUrl(null);
+    }
+
+    // no generar si ya hay imagen de portada en el artículo
+    if (article.image_url) return;
+
+    let mounted = true;
+    const gen = async () => {
+      setPdfThumbLoading(true);
+      setPdfThumbError(null);
+      try {
+        // Cargar PDF.js desde CDN si no está presente (evita dependencia en build)
+        async function ensurePdfJs() {
+          if ((window as any).pdfjsLib) return (window as any).pdfjsLib;
+          await new Promise<void>((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('No se pudo cargar pdfjs desde CDN'));
+            document.head.appendChild(s);
+          });
+          const lib = (window as any).pdfjsLib;
+          try { lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js'; } catch (e) {}
+          return lib;
+        }
+
+        const pdfjs: any = await ensurePdfJs();
+        const pdfUrlStr = article.pdf_url as string;
+        const source = pdfUrlStr.startsWith('data:') ? pdfUrlStr : `/proxy?url=${encodeURIComponent(pdfUrlStr)}`;
+        const loadingTask = pdfjs.getDocument({ url: source });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1 });
+        const targetWidth = 400;
+        const scale = targetWidth / viewport.width;
+        const vp = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = Math.ceil(vp.width);
+        canvas.height = Math.ceil(vp.height);
+        await page.render({ canvasContext: ctx as CanvasRenderingContext2D, viewport: vp }).promise;
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        if (mounted) setPdfThumbDataUrl(dataUrl);
+      } catch (err) {
+        console.warn('Error generando miniatura PDF:', err);
+        if (mounted) setPdfThumbError('No se pudo generar miniatura del PDF');
+      } finally {
+        if (mounted) setPdfThumbLoading(false);
+      }
+    };
+    gen();
+    return () => { mounted = false };
+  }, [article]);
+
+  // Cargar comentarios y reacciones
+  useEffect(() => {
+    if (!articleId) return;
+    let mounted = true;
+    const load = async () => {
+      try {
+        const [cRes, rRes] = await Promise.all([
+          fetch(`http://localhost:5000/article/${articleId}/comments`, { credentials: 'include' }),
+          fetch(`http://localhost:5000/article/${articleId}/reactions`, { credentials: 'include' }),
+        ]);
+        let data: any[] = [];
+        if (cRes.ok) {
+          data = await cRes.json();
+          if (mounted) setComments(data.map((x: any) => ({ id: x.id, user: x.username, userId: x.user_id, text: x.text, time: x.created_at, like: 0, laugh: 0, heart: 0, userReaction: null })));
+        }
+        if (rRes.ok) {
+          const rd = await rRes.json();
+          if (mounted) {
+            setReactions(rd.counts || { heart: 0, like: 0, laugh: 0 });
+            setUserReaction(rd.user_reaction || null);
+          }
+        }
+        // cargar reacciones por comentario
+        if (data && data.length > 0) {
+          // para cada comentario pedimos sus reacciones
+          await Promise.all(data.map(async (cm: any) => {
+            try {
+              const cr = await fetch(`http://localhost:5000/article/${articleId}/comments/${cm.id}/reactions`, { credentials: 'include' });
+                if (cr.ok) {
+                const crd = await cr.json();
+                if (mounted) {
+                  setComments(prev => prev.map(p => p.id === cm.id ? { ...p, like: crd.counts.like || 0, laugh: crd.counts.laugh || 0, heart: crd.counts.heart || 0, userReaction: crd.user_reaction || null } : p));
                 }
+              }
+            } catch (e) {
+              // ignore per-comment reaction errors
+            }
+          }));
+        }
+      } catch (err) {
+        console.warn('Error cargando comentarios/reacciones', err);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [articleId]);
 
-                <h1 className="text-4xl font-bold text-[#29a5a1] mb-4">{article.title}</h1>
-                <div className="flex items-center text-gray-500 mb-6">
-                  <p className="text-sm">Publicado: {article.created_at}</p>
-                  <span className="mx-2"> | </span>
-                  <p className="text-sm">Autor: {article.author} </p>
-                </div>
+  const toggleReaction = async (type: 'heart' | 'like' | 'laugh') => {
+    if (!articleId) return;
+    if (!userId) { alert('Inicia sesión para reaccionar'); return; }
+    try {
+      await fetch(`http://localhost:5000/article/${articleId}/reactions`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
+      const rRes = await fetch(`http://localhost:5000/article/${articleId}/reactions`, { credentials: 'include' });
+      if (rRes.ok) {
+        const rd = await rRes.json();
+        setReactions(rd.counts || { heart: 0, like: 0, laugh: 0 });
+        setUserReaction(rd.user_reaction || null);
+      }
+    } catch (err) {
+      console.warn('Error al enviar reacción', err);
+    }
+  };
 
-                <p className="text-lg text-gray-700 leading-relaxed">{article.content}</p>
+  const toggleCommentReaction = async (commentId: number, type: 'heart' | 'like' | 'laugh') => {
+    if (!articleId) return;
+    if (!userId) { alert('Inicia sesión para reaccionar a comentarios'); return; }
+    try {
+      await fetch(`http://localhost:5000/article/${articleId}/comments/${commentId}/reactions`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type })
+      });
+      const r = await fetch(`http://localhost:5000/article/${articleId}/comments/${commentId}/reactions`, { credentials: 'include' });
+      if (r.ok) {
+        const rd = await r.json();
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, like: rd.counts.like || 0, laugh: rd.counts.laugh || 0, heart: rd.counts.heart || 0, userReaction: rd.user_reaction || null } : c));
+      }
+    } catch (err) {
+      console.warn('Error al enviar reacción a comentario', err);
+    }
+  };
+
+  const startEdit = (id: number, text: string) => { setEditingId(id); setEditingText(text); };
+  const cancelEdit = () => { setEditingId(null); setEditingText(''); };
+
+  const saveEdit = async (id: number) => {
+    if (!articleId) return;
+    try {
+      const res = await fetch(`http://localhost:5000/article/${articleId}/comments/${id}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: editingText })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setComments(prev => prev.map(c => c.id === id ? { ...c, id: updated.id, user: updated.username, userId: updated.user_id, text: updated.text, time: updated.created_at } : c));
+        cancelEdit();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'No autorizado o error al editar');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteComment = async (id: number) => {
+    if (!articleId) return;
+    if (!confirm('¿Eliminar este comentario?')) return;
+    try {
+      const res = await fetch(`http://localhost:5000/article/${articleId}/comments/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) setComments(prev => prev.filter(c => c.id !== id));
+      else { const err = await res.json().catch(() => ({})); alert(err.error || 'No autorizado'); }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!articleId) return;
+    const text = newComment.trim(); if (!text) return;
+    try {
+      const res = await fetch(`http://localhost:5000/article/${articleId}/comments`, {
+        method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text, username: username || 'Anónimo' })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setComments(prev => [{ id: created.id, user: created.username, userId: created.user_id, text: created.text, time: created.created_at, like: 0, laugh: 0, heart: 0, userReaction: null }, ...prev]);
+        setNewComment('');
+      } else {
+        const err = await res.json().catch(() => ({})); alert(err.error || 'Error publicando comentario');
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const canModify = (commentUserId: number | null, commentAnonId?: string | null) => {
+    // Solo el autor puede modificar: si existe userId se compara, si es anónimo se asume backend validará por session anon_id
+    return commentUserId !== null && userId !== null && commentUserId === userId;
+  };
+
+  const formatDate = (iso?: string | null) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  if (!article) return <p className="text-4xl font-bold mb-6">Cargando artículo...</p>;
+
+  return (
+    <div className="news-layout">
+      <main className="news-content">
+        {article.image_url && <figure className="news-image"><img src={article.image_url} alt={article.title} /></figure>}
+        <h1 className="news-title">{article.title}</h1>
+        <div className="news-meta">Publicado: {article.created_at} | Autor: {article.author}</div>
+        <article className="news-body">{article.content && article.content.split('\n').map((line, i) => <p key={i} className="mb-2">{line}</p>)}</article>
+
+        {article.pdf_url && (
+          <div className="mt-6">
+            {pdfThumbLoading ? (
+              <div className="w-full h-64 flex items-center justify-center">Generando miniatura del PDF...</div>
+            ) : pdfThumbComputedUrl ? (
+              <a href={article.pdf_url} target="_blank" rel="noopener noreferrer" className="inline-block w-full">
+                <img
+                  src={pdfThumbComputedUrl}
+                  alt={article.title + ' - PDF miniatura'}
+                  className="w-full h-64 object-cover rounded shadow-sm"
+                  onError={() => {
+                    // If computed thumbnail fails, clear it so we fall back to generated thumbnail or embed
+                    setPdfThumbComputedUrl(null);
+                  }}
+                />
+              </a>
+            ) : pdfThumbDataUrl ? (
+              <a href={article.pdf_url} target="_blank" rel="noopener noreferrer" className="inline-block w-full">
+                <img src={pdfThumbDataUrl} alt={article.title + ' - PDF miniatura'} className="w-full h-64 object-cover rounded shadow-sm" />
+              </a>
+            ) : pdfLoading ? (
+              <div className="w-full h-[600px] flex items-center justify-center">Cargando PDF...</div>
+            ) : pdfError ? (
+              <div className="p-6 text-center text-red-600">{pdfError}</div>
+            ) : (
+              <object data={pdfSrc || undefined} type="application/pdf" className="w-full h-[600px]"><iframe src={pdfSrc || undefined} className="w-full h-[600px]" title={article.title + ' - PDF'} /></object>
+            )}
+            <div className="mt-2"><a href={article.pdf_url || pdfSrc || undefined} target="_blank" rel="noopener noreferrer" className="text-sm text-[#0081a1] underline">Abrir/Descargar PDF</a></div>
+          </div>
+        )}
+
+        {article.video_url && (
+          <div className="mb-6 mt-6">
+            <div className="w-full bg-gray-50 rounded-lg overflow-hidden shadow-sm">
+              {videoThumbDataUrl && !videoThumbLoadError ? (
+                <a href={article.video_url} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+                  <img
+                    src={videoThumbDataUrl}
+                    alt={article.title + ' - video thumb'}
+                    className="w-full h-64 object-cover"
+                    onError={() => {
+                      setVideoThumbLoadError(true);
+                      if (article.image_url) setVideoThumbDataUrl(article.image_url);
+                    }}
+                    onLoad={() => setVideoThumbLoadError(false)}
+                  />
+                </a>
+              ) : !videoThumbError ? (
+                <div className="w-full h-64 bg-gray-100 flex items-center justify-center">{videoThumbLoading ? 'Generando miniatura...' : 'Miniatura'}</div>
+              ) : article.image_url ? (
+                <a href={article.video_url} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+                  <img src={article.image_url} alt={article.title + ' - video'} className="w-full h-64 object-cover" />
+                </a>
+              ) : (
+                <div className="w-full h-64 bg-gray-200 flex items-center justify-center">No hay miniatura</div>
+              )}
+
+              {/* diagnóstico oculto en producción: no mostrar la URL calculada al usuario */}
+
+              <div className="p-4"><h3 className="text-lg font-semibold">Video adjunto</h3><p className="text-sm text-gray-600">Haz clic en la miniatura para ver el video en su origen.</p></div>
             </div>
-        </Layout>
-    );
-}
+          </div>
+        )}
+      </main>
+
+      <aside className="news-comments">
+        <div className="comments-header">
+            <div style={{display:'flex', gap:12, alignItems:'center'}}>
+              {userReaction ? (
+                // Si el usuario ya reaccionó, mostramos sólo su emoji seleccionado; al hacer click abre el picker para cambiar
+                <div style={{position:'relative'}}>
+                  <button className={`btn-reaction active`} aria-label="Tu reacción" onClick={() => setArticlePickerOpen(v => !v)}>
+                    {userReaction === 'heart' ? '❤️' : userReaction === 'like' ? '👍' : '😂'} {(reactions as any)[userReaction] && (reactions as any)[userReaction] > 0 ? (reactions as any)[userReaction] : ''}
+                  </button>
+                  {articlePickerOpen && (
+                    <div style={{position:'absolute', top:40, left:0, display:'flex', gap:8, background:'#fff', padding:8, borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.12)'}}>
+                      <button className="btn-reaction" onClick={async () => { await toggleReaction('heart'); setArticlePickerOpen(false); }} aria-label="Me encanta">❤️ {reactions.heart > 0 ? reactions.heart : ''}</button>
+                      <button className="btn-reaction" onClick={async () => { await toggleReaction('like'); setArticlePickerOpen(false); }} aria-label="Me gusta">👍 {reactions.like > 0 ? reactions.like : ''}</button>
+                      <button className="btn-reaction" onClick={async () => { await toggleReaction('laugh'); setArticlePickerOpen(false); }} aria-label="Me divierte">😂 {reactions.laugh > 0 ? reactions.laugh : ''}</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Si no ha reaccionado, mostramos las tres opciones (selector simple)
+                <div style={{display:'flex', gap:8}}>
+                  <button className="btn-reaction" onClick={() => toggleReaction('heart')} aria-label="Me encanta">❤️ {reactions.heart > 0 ? reactions.heart : ''}</button>
+                  <button className="btn-reaction" onClick={() => toggleReaction('like')} aria-label="Me gusta">👍 {reactions.like > 0 ? reactions.like : ''}</button>
+                  <button className="btn-reaction" onClick={() => toggleReaction('laugh')} aria-label="Me divierte">😂 {reactions.laugh > 0 ? reactions.laugh : ''}</button>
+                </div>
+              )}
+            </div>
+        </div>
+
+        {comments.length === 0 ? <div className="p-4 text-gray-600">Aún no hay comentarios. Sé el primero en comentar.</div> : comments.map(c => (
+          <section id={`comment-${c.id}`} key={c.id} className="comment">
+            <div className="comment-user">{c.user}</div>
+            {editingId === c.id ? (
+              <div>
+                <input className="comment-edit-input" value={editingText} onChange={(e) => setEditingText(e.target.value)} />
+                <div style={{marginTop:8, display:'flex', gap:8}}>
+                  <button className="btn-like" onClick={() => saveEdit(c.id)}>Guardar</button>
+                  <button className="btn-reply" onClick={cancelEdit}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="comment-text">{c.text}</p>
+                <div className="comment-date text-sm text-gray-500 mt-2">{formatDate(c.time)}</div>
+              </>
+            )}
+            <div className="comment-actions" style={{display:'flex', alignItems:'center', gap:8, marginTop:8}}>
+              <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                {c.userReaction ? (
+                  <div style={{position:'relative'}}>
+                    <button className="btn-reaction active" aria-label="Tu reacción" onClick={() => setOpenCommentPickerId(openCommentPickerId === c.id ? null : c.id)}>
+                      {c.userReaction === 'heart' ? '❤️' : c.userReaction === 'like' ? '👍' : '😂'} {((c as any)[c.userReaction] && (c as any)[c.userReaction] > 0) ? (c as any)[c.userReaction] : ''}
+                    </button>
+                    {openCommentPickerId === c.id && (
+                      <div style={{position:'absolute', top:36, left:0, display:'flex', gap:8, background:'#fff', padding:8, borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.12)'}}>
+                        <button className="btn-reaction" onClick={async () => { await toggleCommentReaction(c.id, 'heart'); setOpenCommentPickerId(null); }} aria-label="Me encanta comentario">❤️ {c.heart && c.heart > 0 ? c.heart : ''}</button>
+                        <button className="btn-reaction" onClick={async () => { await toggleCommentReaction(c.id, 'like'); setOpenCommentPickerId(null); }} aria-label="Me gusta comentario">👍 {c.like && c.like > 0 ? c.like : ''}</button>
+                        <button className="btn-reaction" onClick={async () => { await toggleCommentReaction(c.id, 'laugh'); setOpenCommentPickerId(null); }} aria-label="Me divierte comentario">😂 {c.laugh && c.laugh > 0 ? c.laugh : ''}</button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <button className="btn-reaction" onClick={() => toggleCommentReaction(c.id, 'heart')} aria-label="Me encanta comentario">❤️ {c.heart && c.heart > 0 ? c.heart : ''}</button>
+                    <button className="btn-reaction" onClick={() => toggleCommentReaction(c.id, 'like')} aria-label="Me gusta comentario">👍 {c.like && c.like > 0 ? c.like : ''}</button>
+                    <button className="btn-reaction" onClick={() => toggleCommentReaction(c.id, 'laugh')} aria-label="Me divierte comentario">😂 {c.laugh && c.laugh > 0 ? c.laugh : ''}</button>
+                  </>
+                )}
+              </div>
+              <div style={{flex:1}} />
+              {canModify(c.userId) && editingId !== c.id && (
+                <div className="comment-controls">
+                  <button className="btn-reply" onClick={() => startEdit(c.id, c.text)}>Editar</button>
+                  <button className="btn-reply" onClick={() => deleteComment(c.id)}>Eliminar</button>
+                </div>
+              )}
+            </div>
+          </section>
+        ))}
+
+        {userId ? (
+          <form className="comment-form" onSubmit={handleSubmitComment}>
+            <textarea placeholder={`Comentar como ${username || 'Usuario'}`} value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+            <button type="submit">Publicar</button>
+          </form>
+        ) : (
+          <div className="p-4 text-gray-600">Inicia sesión para comentar o reaccionar.</div>
+        )}
+      </aside>
+    </div>
+  );
+};
+
 export default ArticlePage;
+

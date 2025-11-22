@@ -1,241 +1,113 @@
-from flask import Flask, request, jsonify, session
-from sqlalchemy import text
-from models import article
-from models.article import  Article
-from models.user import User
+from flask import Flask, render_template
 from models import db
 from flask_cors import CORS
+import os
+import logging
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
-
-app = Flask(__name__)
-
-
-CORS(app, 
-     supports_credentials=True,
-     origins=["http://localhost:3000"],
-     allow_headers=["Content-Type"],
-     expose_headers=["Set-Cookie"],
-     methods=["GET", "POST", "OPTIONS", "DELETE"])
-
-app.secret_key = 'rdeart123'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-#engine = create_engine('sqlite:///blog.db', echo=True)
-
-#Base.metadata.create_all(engine)
-
-db.init_app(app)
-
-
-    
-with app.app_context():
-    db.create_all()
-    # Corregir valores NULL en is_favorite
-    db.session.execute(text("UPDATE article SET is_favorite = 0 WHERE is_favorite IS NULL;"))
-    db.session.commit()
-    
-    
-# Ruta inicial
-@app.route('/')
-def home():
-    return 'Hola, Flask!'
-
-
-
-@app.route('/register', methods=['POST'])
-def register_user():
-    data = request.get_json()
-    if User.query.filter_by(email=data['email']).first() is not None:
-        return jsonify({
-            'error': 'El email ya esta registrado'
-        }), 400
-        
-    if User.query.filter_by(username=data['username']).first() is not None:
-        return jsonify({
-            'error': 'El nombre de usuario ya esta registrado'
-        }), 400
-
-
-    new_user = User(username=data['username'], email=data['email'])
-    new_user.set_password(data['password'])
-    db.session.add(new_user)
-    db.session.commit()
-    return jsonify({
-        'message': f'Usuario {new_user.username} registrado con exito'
-    }), 201
-
-
-
-@app.route('/login', methods=['POST'])
-def login_user():
-    data = request.get_json()
-    user = User.query.filter_by(email=data['email']).first()
-
-    if user and user.check_password(data['password']):
-        session['user_id'] = user.id
-        print(session)
-
-        return jsonify({'message': 'Inicio de sesion exitoso'}), 200
-    else:
-        return jsonify({'error': 'Credenciales invalidas'}), 401
+try:
+    # Load .env automatically if python-dotenv is available
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    logging.exception('dotenv not installed; skipping load_dotenv')
     
 
 
 
-@app.route('/check-auth', methods=['GET'])
-def check_auth():
-    user_id = session.get('user_id')
+def create_app():
+    app = Flask(__name__)
+    app.secret_key = 'rdeart_super_secret_key_2025'
+    # Ensure instance folder exists and use absolute DB path to avoid SQLite open errors
+    instance_dir = os.path.join(os.path.dirname(__file__), 'instance')
+    os.makedirs(instance_dir, exist_ok=True)
+    db_file = os.path.join(instance_dir, 'blog.db')
+    db_uri = 'sqlite:///' + os.path.abspath(db_file).replace('\\', '/')
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    if user_id:
-        user = User.query.get(user_id)
-        if user:
-            return jsonify({
-                'authenticated': True,
-                'username': user.username}), 200
-        else:
-            return jsonify({
-                'authenticated': False}), 401  
-    else:
-        return jsonify({
-            'authenticated': False}), 401      
+    db.init_app(app)
 
+    CORS(app,
+        supports_credentials=True,
+        origins=[
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'http://192.10.2.191:3000',
+        ],
+        allow_headers=["Content-Type"],
+        expose_headers=["Set-Cookie"],
+        methods=["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"])
 
-
-
-@app.route('/logout', methods=['POST'])
-def logout_user():
-    session.pop('user_id', None)    
-    return jsonify({'message': 'Sesion cerrada con exito'})
-
-
-@app.route('/favorites/<int:article_id>', methods=['POST'])
-def toggle_favorite(article_id):
-    data = request.get_json()
-    is_favorite = data.get('is_favorite')
-    if is_favorite is None:
-        is_favorite = False  # Valor por defecto si no se envía
-
-    article = Article.query.get_or_404(article_id)
-    article.is_favorite = is_favorite
-
-    db.session.commit()
-
-    return jsonify({'message': 'Estado de favorito actualizado'}), 201
-
-@app.route ('/favorites', methods=['GET'])
-def get_favorites():
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'El usuario no está autenticado o el ID de usuario no está en la sesión'}), 401
-    
-
-    favorite_articles = Article.query.filter_by(user_id=user_id, is_favorite=True).all()
-    articles_list =[{
-        'id': article.id,
-        'title': article.title,
-        'content': article.content,
-        'image_url': article.image_url,
-    'created_at': article.created_at.isoformat(),
-        'is_favorite': article.is_favorite
-        
-    } for article in favorite_articles]
-
-    return jsonify(articles_list), 200
-
-
-
-# Obtenemos todos los articulos
-@app.route('/articles', methods=['GET']) # GET es para obtener
-def get_articles():
-    articles = Article.query.all()
-    return jsonify([{
-        'id': article.id,
-        'title': article.title,
-        'content': article.content,
-        'image_url': article.image_url,
-        'author': article.author.username,
-        'created_at': article.created_at.strftime('%d-%m-%Y')
-    } for article in articles])
-
-
-#Creamos un articulo
-@app.route('/articles', methods=['POST'])  # POST es para enviar
-def create_article():
-    data = request.get_json()
-    user_id = session.get('user_id')
-
-    if not user_id:
-        return jsonify({'error': 'El usuario no está autenticado o el ID de usuario no está en la sesión'}), 401
-    new_article = Article(
-        title=data['title'], 
-        content=data['content'],
-        image_url=data['image_url'],
-        user_id = user_id
-        )
-    db.session.add(new_article)
-    db.session.commit()       
-    
-    return  jsonify({
-        'id': new_article.id,
-        'title': new_article.title,
-        'content': new_article.content,
-        'image_url': new_article.image_url,
-        'author': new_article.author.username
-    }), 201
-
-
-# Actualizamos un articulo
-@app.route('/articles/<int:article_id>', methods=['PUT'])  # PUT es para actualizar
-def update_article(article_id):
-    article = Article.query.get_or_404(article_id)
-    data = request.get_json()
-    article.title = data['title']
-    article.content = data['content']
-    db.session.commit()
-
-    return  jsonify({
-        'id': article.id,
-        'title': article.title,
-        'content': article.content
-    })
-
-
-
-# Eliminamos  un articulo
-@app.route('/articles/<int:article_id>', methods=['DELETE']) # DELETE es para eliminar
-def delete_article(article_id):
-    article = Article.query.get_or_404(article_id)
-    db.session.delete(article)
-    db.session.commit()
-    return jsonify({
-        'message': f'Articulo eliminado con exito. Se elimino {article.title}'
-    }), 200
-
-
-
-
-
-# Obtenemos un articulo
-@app.route('/article/<int:article_id>', methods=['GET'])
-def view_article(article_id):
-    article = Article.query.get_or_404(article_id)
-    return jsonify({
-        'id': article.id,
-        'title': article.title,
-        'content': article.content,
-        'image_url': article.image_url,
-        'author': article.author.username,
-        'created_at': article.created_at.strftime('%d-%m-%Y'),
-        'is_favorite': article.is_favorite
-    })
-
-
-
-if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(debug=True)
+        try:
+            print(f'[startup] Using DB URI: {app.config["SQLALCHEMY_DATABASE_URI"]}')
+            db.create_all()
+        except SQLAlchemyError:
+            logging.exception('[startup] Error running create_all()')
+        # Ensure 'tag' column exists on Article table (safe alter for dev DBs)
+        try:
+            # Check existing columns
+            res = db.session.execute(text("PRAGMA table_info(article);"))
+            columns = [row[1] for row in res.fetchall()]
+            print('[startup] article table columns:', columns)
+            if 'tag' not in columns:
+                # Add tag column
+                print('[startup] tag column missing, attempting ALTER TABLE to add it')
+                db.session.execute(text("ALTER TABLE article ADD COLUMN tag VARCHAR(150);"))
+                db.session.commit()
+                print('[startup] ALTER TABLE executed, tag column added')
+            # Ensure pdf_url column exists as well
+            if 'pdf_url' not in columns:
+                print('[startup] pdf_url column missing, attempting ALTER TABLE to add it')
+                db.session.execute(text("ALTER TABLE article ADD COLUMN pdf_url TEXT;"))
+                db.session.commit()
+                print('[startup] ALTER TABLE executed, pdf_url column added')
+            # Ensure video_url column exists as well
+            if 'video_url' not in columns:
+                print('[startup] video_url column missing, attempting ALTER TABLE to add it')
+                db.session.execute(text("ALTER TABLE article ADD COLUMN video_url TEXT;"))
+                db.session.commit()
+                print('[startup] ALTER TABLE executed, video_url column added')
+                # Ensure user profile columns exist
+                res_user = db.session.execute(text("PRAGMA table_info(user);"))
+                user_columns = [row[1] for row in res_user.fetchall()]
+                print('[startup] user table columns:', user_columns)
+                if 'first_name' not in user_columns:
+                    print('[startup] first_name missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN first_name VARCHAR(120);"))
+                    db.session.commit()
+                if 'last_name' not in user_columns:
+                    print('[startup] last_name missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN last_name VARCHAR(120);"))
+                    db.session.commit()
+                if 'area' not in user_columns:
+                    print('[startup] area missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN area VARCHAR(150);"))
+                    db.session.commit()
+                if 'photo_url' not in user_columns:
+                    print('[startup] photo_url missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN photo_url TEXT;"))
+                    db.session.commit()
+        except SQLAlchemyError:
+            # If anything fails here, avoid crashing the app on startup but log error
+            logging.exception('[startup] Error ensuring DB columns')
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
 
 
+    from routes import auth_roustes, article_routes, chat_routes
+    app.register_blueprint(auth_roustes.bp)
+    app.register_blueprint(article_routes.bp)
+    app.register_blueprint(chat_routes.bp)
 
+    # Root route to serve the chat UI template
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+
+    return app

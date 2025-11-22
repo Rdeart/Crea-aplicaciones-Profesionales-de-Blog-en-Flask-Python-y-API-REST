@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KAT IA — Chat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <h1>KAT IA — Asistente Comercial</h1>
+      </header>
+
+      <main>
+        <div id="chat-container">
+          <div id="chat-window">
+            <div id="chat-header" class="chat-header">
+              <strong>KAT IA — Asistente</strong>
+              <button id="chat-close-button" aria-label="Cerrar chat" title="Cerrar" class="chat-close">×</button>
+            </div>
+            <div id="messages"></div>
+          </div>
+
+          <div id="chat-controls">
+            <input id="chat-input" placeholder="Escribe tu mensaje..." autocomplete="off" />
+            <button id="chat-send">Enviar</button>
+          </div>
+        </div>
+
+        <button id="chatbot-open-button" class="avatar-only" title="Abrir chat" style="background:transparent;border:none;padding:0;box-shadow:none;width:auto;height:auto;">
+          <img src="{{ url_for('static', filename='img/chatbot-avatar-transparent.png') }}" alt="Avatar" id="chatbot-avatar"
+            style="height:112px;width:auto;max-width:112px;object-fit:contain;transition: transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms; will-change: transform; -webkit-transform: translateZ(0); transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; cursor:pointer;"
+            onmouseover="this.style.transform='translateY(-12px) scale(1.12)';"
+            onmouseout="this.style.transform='translateY(0) scale(1)';"
+            onmousedown="this.style.transform='translateY(-3px) scale(0.98)';"
+            onmouseup="this.style.transform='translateY(0) scale(1)';"
+          >
+        </button>
+
+      </main>
+
+      <script src="{{ url_for('static', filename='js/chat-script.js') }}"></script>
+    </div>
+  </body>
+</html>

@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@/src/context/AuthProvider";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
@@ -68,10 +69,16 @@ const Register = () => {
                 required
                 />                
             </div>
-            <button className="w-full bg-[#29a5a1] text-white p-2 rounded hover:bg-[#58dbd6]">
+            <button className="w-full bg-[#0081a1] text-white p-2 rounded hover:bg-[#58dbd6]">
                 Registrarse
             </button>
         </form>
+        <div className="text-center mt-6">
+                <p className="text-gray-700">¿Ya tienes una cuenta? {' '}</p>
+                <Link href='/pages/login'>
+                    <span className="text-[#0081a1] hover:underline">Inicia Sesion</span>
+                </Link>
+            </div>
     </div>
   )
 }

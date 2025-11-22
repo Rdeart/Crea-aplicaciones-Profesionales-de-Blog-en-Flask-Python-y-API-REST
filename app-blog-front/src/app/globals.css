@@ -19,3 +19,191 @@
   }
 }
 
+/* News layout styles (adapted from user's example) */
+.site-header {
+  height: 60px;
+  background: #0084a8;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.site-header .logo { font-weight: 700 }
+.site-header .search { flex: 1; max-width: 400px; padding: 6px 10px; border-radius: 999px; border: none }
+.site-header .user-info { font-size: .9rem }
+
+.news-layout { max-width: 1400px; margin: 24px auto; display: flex; gap: 24px; align-items: flex-start }
+.news-content { flex: 2; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05) }
+.news-image img { width: 100%; border-radius: 8px; display: block }
+.news-title { margin-top: 20px; font-size: 2rem; color: #00728c }
+.news-meta { margin-top: 4px; font-size: .85rem; color: #777 }
+.news-body { margin-top: 16px; line-height: 1.6; font-size: 1rem }
+
+.news-comments { flex: 1.4; min-width: 420px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); max-height: calc(100vh - 80px); overflow-y: auto; font-size: .95rem }
+.comments-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-weight: 600 }
+.comment { border-bottom: 1px solid #eee; padding: 8px 0 12px }
+.comment:last-child { border-bottom: none }
+.comment-user { font-weight: 600; margin-bottom: 4px }
+.comment-text { margin: 0 0 6px }
+.comment-actions { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: #777 }
+.btn-like, .btn-reply { border: none; background: transparent; cursor: pointer; font-size: .8rem }
+.comment-form { margin-top: 12px; display: flex; flex-direction: column; gap: 8px }
+.comment-form textarea { min-height: 100px; resize: vertical; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-family: inherit }
+.comment-form button { align-self: stretch; padding: 10px 16px; border-radius: 8px; border: none; background: #0084a8; color: white; cursor: pointer }
+
+.comment-controls { display:flex; gap:8px; align-items:center }
+.comment-edit-input { width:100%; padding:8px; border-radius:8px; border:1px solid #ddd }
+
+/* Estilos para reacciones */
+.btn-reaction { border: none; background: transparent; cursor: pointer; font-size: 1.05rem; padding: 6px 10px; border-radius: 8px }
+.btn-reaction:hover { background: #f3f7f9 }
+.btn-reaction.active { background: #e0f6fb; color: #00728c }
+
+@media (max-width: 900px) { .news-layout { flex-direction: column } }
+
+/* --- Normalizar estilos de encabezados (unificar títulos) --- */
+/* Objetivo: mismos colores, peso y tamaños coherentes en toda la app */
+/* Color principal usado en el layout */
+:root {
+  --brand-color: #00728c;
+  --heading-weight: 700;
+}
+
+/* Encabezados globales */
+h1, .news-title {
+  color: var(--brand-color);
+  font-weight: var(--heading-weight);
+  line-height: 1.15;
+  margin: 0 0 0.6rem 0;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; color: var(--brand-color); font-weight: var(--heading-weight); margin: 0 0 0.5rem 0; }
+h3 { font-size: 1.125rem; color: var(--brand-color); font-weight: var(--heading-weight); margin: 0 0 0.4rem 0; }
+
+/* Contenedores específicos: asegurar consistencia dentro del contenido de noticias y modales */
+.news-content h1, .news-content h2, .news-content h3 { color: var(--brand-color); font-weight: var(--heading-weight); }
+.news-comments h2, .news-comments h3 { color: #222; font-weight: 600; }
+.modal h2, .modal .modal-title { color: #0f1720; font-weight: 700; }
+
+/* Asegurar que títulos no hereden color del header (ej. blanco) */
+.notifications-popup, .notifications-popup * { color: inherit !important; }
+
+
+/* CONTENEDOR DEL POPUP DE NOTIFICACIONES */
+
+.notifications-popup {
+  position: absolute;          /* posicionamiento relativo al contenedor .relative */
+  top: calc(100% + 8px);       /* justo debajo del botón */
+  left: 50%;                   /* centrado respecto al botón */
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: none; /* oculto por defecto; se abre añadiendo la clase is-open */
+}
+.notifications-popup.is-open {
+  display: block;
+}
+
+/* Flechita hacia la campana */
+.notifications-popup::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 12px 14px 12px;
+  border-style: solid;
+  border-color: transparent transparent #ffffff transparent;
+}
+
+/* TARJETA DE NOTIFICACIÓN */
+.notification-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  padding: 12px 18px;
+  border-radius: 18px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  min-width: 420px; /* más ancho para evitar saltos de línea */
+  max-width: 520px;
+}
+
+/* Forzar color de texto dentro del popup (evitar herencia de header blanco) */
+.notifications-popup,
+.notifications-popup * {
+  color: #111 !important;
+}
+
+/* Avatar circular */
+.notification-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Texto */
+.notification-text {
+  flex: 1;
+}
+
+.notification-user-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 2px;
+}
+
+.notification-action {
+  font-size: 1.1rem;
+}
+
+.notification-action { color: #333 }
+
+.notification-article-title {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Miniatura de la noticia */
+.notification-article {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-decoration: none;
+  color: inherit;
+  width: 120px; /* miniatura ligeramente más ancha */
+  flex-shrink: 0;
+}
+
+.notification-article img {
+  width: 100%;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.notification-article-title {
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+/* Emoji junto al texto de la acción */
+.notification-action .notification-emoji {
+  margin-left: 6px;
+  font-size: 1rem;
+}
+
+/* (Opcional) Colores distintos según tipo de notificación */
+
+
+
+

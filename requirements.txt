@@ -1,0 +1,8 @@
+Flask>=2.2
+Flask-SQLAlchemy>=3.0
+Flask-Cors>=3.0
+python-dotenv>=1.0
+requests>=2.28
+PyMuPDF>=1.22
+# Optional (only if you use Pillow for image processing elsewhere)
+Pillow>=9.0
