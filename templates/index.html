@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>KAT IA — Chat</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <style>
+      .chat-modal-container {
+        position: absolute !important;
+        inset: auto !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        border-radius: 8px !important;
+      }
+      
+      .chat-modal-popup {
+        margin: 20px !important;
+        max-width: calc(100% - 40px) !important;
+        max-height: calc(100% - 40px) !important;
+        transform: none !important;
+      }
+    </style>
   </head>
   <body>
     <div class="page">
@@ -40,6 +62,8 @@
 
       </main>
 
+      <!-- SweetAlert2 JS -->
+      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
       <script src="{{ url_for('static', filename='js/chat-script.js') }}"></script>
     </div>
   </body>

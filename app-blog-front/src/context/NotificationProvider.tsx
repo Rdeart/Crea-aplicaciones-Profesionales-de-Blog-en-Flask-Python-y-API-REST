@@ -38,7 +38,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/notifications', { credentials: 'include' });
+      const res = await fetch('http://localhost:5000/notifications', { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data);
@@ -52,7 +52,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUnreadCount = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/notifications/unread_count', { credentials: 'include' });
+      const res = await fetch('http://localhost:5000/notifications/unread_count', { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       setUnreadCount(data.unread || 0);
@@ -71,7 +71,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   const markAsRead = async (id: number) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/notifications/${id}/read`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`http://localhost:5000/notifications/${id}/read`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         setNotifications((prev) => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
       }

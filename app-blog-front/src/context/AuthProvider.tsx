@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     useEffect(() => {
         const checkAuthStatus = async () => {
             try {
-                const response = await fetch('http://127.0.0.1:5000/check-auth', {credentials: 'include'})
+                const response = await fetch('http://localhost:5000/check-auth', {credentials: 'include'})
                 const data = await response.json()
                 if (data.authenticated){
                     setIsAuthenticated(data.authenticated)                 
@@ -25,7 +25,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
                     setUserId(data.user_id)
                     // Si está autenticado, traemos también el perfil (si existe)
                     try {
-                        const prof = await fetch('http://127.0.0.1:5000/user/profile', {credentials: 'include'})
+                        const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
                         if (prof.ok) {
                             const pd = await prof.json().catch(() => null)
                             if (pd) setProfile(pd)
@@ -55,14 +55,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     const register = async (username:string, email: string, password:string): Promise<{success: boolean, message: string}> => {
         try {
-            const response = await fetch('http://127.0.0.1:5000/register', {
+            const response = await fetch('http://localhost:5000/register', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({username, email, password})
             })
             if (response.ok){
-                return {success: true, message: 'Usuario registrado con exito'}
+                // Después de registrar exitosamente, iniciar sesión automáticamente
+                const loginResult = await login(email, password)
+                if (loginResult.success) {
+                    return {success: true, message: 'Usuario registrado con exito y sesión iniciada'}
+                } else {
+                    return {success: false, message: 'Usuario registrado pero error al iniciar sesión: ' + loginResult.message}
+                }
             } else {
                 const data = await response.json().catch(() => null)
                 return {success: false, message: data?.error || 'Error en el registro'}
@@ -75,7 +81,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     const login = async (email: string, password: string): Promise<{success: boolean, message: string}> => {
         try {
-            const response = await fetch('http://127.0.0.1:5000/login', {
+            const response = await fetch('http://localhost:5000/login', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {'Content-Type': 'application/json'},
@@ -84,7 +90,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
             if (response.ok) {
                 // successful login: fetch session info
                 try {
-                    const check = await fetch('http://127.0.0.1:5000/check-auth', {credentials: 'include'})
+                    const check = await fetch('http://localhost:5000/check-auth', {credentials: 'include'})
                     const data = await check.json()
                     if (data.authenticated){
                         setIsAuthenticated(true)
@@ -92,7 +98,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
                         setUserId(data.user_id)
                         // cargar perfil tras inicio de sesión
                         try {
-                            const prof = await fetch('http://127.0.0.1:5000/user/profile', {credentials: 'include'})
+                            const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
                             if (prof.ok) {
                                 const pd = await prof.json().catch(() => null)
                                 if (pd) setProfile(pd)
@@ -118,7 +124,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     const logout = async (): Promise<{success: boolean}> => {
         try {
-            const response = await fetch('http://127.0.0.1:5000/logout', {
+            const response = await fetch('http://localhost:5000/logout', {
                 method: 'POST',
                 credentials: 'include'
             })
@@ -136,7 +142,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     // Función para recargar el perfil desde el backend manualmente
     const refreshProfile = async () => {
         try {
-            const prof = await fetch('http://127.0.0.1:5000/user/profile', {credentials: 'include'})
+            const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
             if (prof.ok) {
                 const pd = await prof.json().catch(() => null)
                 setProfile(pd)

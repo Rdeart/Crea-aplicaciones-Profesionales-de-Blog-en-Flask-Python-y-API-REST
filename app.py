@@ -6,13 +6,37 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+# Cargar variables de entorno de forma robusta
 try:
-    # Load .env automatically if python-dotenv is available
     from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    logging.exception('dotenv not installed; skipping load_dotenv')
+    # Forzar la recarga del archivo .env
+    load_dotenv(override=True)
     
+    # Verificar critical variables al inicio
+    google_api_key = os.environ.get('GOOGLE_API_KEY')
+    if not google_api_key:
+        logging.error('⚠️ GOOGLE_API_KEY no encontrada en variables de entorno')
+        print('⚠️ ERROR: GOOGLE_API_KEY no configurada. El chatbot no funcionará.')
+    else:
+        print('✅ GOOGLE_API_KEY cargada correctamente')
+        
+except ImportError:
+    logging.error('❌ python-dotenv no instalado; intentando carga manual')
+    # Intentar carga manual si dotenv no está disponible
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                for line in f:
+                    if line.strip() and not line.startswith('#'):
+                        key, value = line.strip().split('=', 1)
+                        os.environ[key] = value
+            print('✅ Variables cargadas manualmente desde .env')
+        else:
+            print('❌ Archivo .env no encontrado')
+    except Exception as e:
+        logging.error(f'❌ Error cargando .env manualmente: {e}')
+        print(f'❌ Error crítico cargando variables de entorno: {e}')
 
 
 
@@ -26,6 +50,11 @@ def create_app():
     db_uri = 'sqlite:///' + os.path.abspath(db_file).replace('\\', '/')
     app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # Cookie configuration for CORS
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = False  # False para HTTP en desarrollo
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
 
     db.init_app(app)
 
@@ -35,6 +64,7 @@ def create_app():
             'http://localhost:3000',
             'http://127.0.0.1:3000',
             'http://192.10.2.191:3000',
+            'http://192.10.2.141:3000',
         ],
         allow_headers=["Content-Type"],
         expose_headers=["Set-Cookie"],
