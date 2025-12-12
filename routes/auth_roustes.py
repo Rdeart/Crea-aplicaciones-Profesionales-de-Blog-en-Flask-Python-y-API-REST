@@ -2,8 +2,10 @@ from flask import Blueprint, request, jsonify, session
 from models import User, db
 from models.article import Article
 from services.auth_service import register_user, login_user, logout_user, get_profile, update_profile
+from utils.auth_decorators import login_required
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+import jwt
 
 
 
@@ -29,23 +31,70 @@ def logout_user_route():
 
 @bp.route('/check-auth', methods=['GET'])
 def check_auth_route():
-    user_id = session.get('user_id')
-    if user_id:
-        try:
-            # Select only username to avoid loading full User row (prevents errors if new columns missing)
-            username = db.session.query(User.username).filter_by(id=user_id).scalar()
-        except SQLAlchemyError:
-            # If any DB error (missing columns), return unauthenticated to keep site running
-            logging.exception('auth: error checking auth username')
-            return jsonify({'authenticated': False}), 401
-        if username:
-            return jsonify({'authenticated': True, 'username': username, 'user_id': user_id}), 200
+    token = request.headers.get('Authorization')
+    if not token:
+        token = request.args.get('token')
+    
+    if not token:
         return jsonify({'authenticated': False}), 401
-    else:
-        return jsonify({
-                'authenticated': False,
+    
+    try:
+        if token.startswith('Bearer '):
+            token = token[7:]
+        
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        user = User.query.get(user_id)
+        if user:
+            return jsonify({
+                'authenticated': True, 
+                'username': user.username, 
+                'user_id': user_id
+            }), 200
+        else:
+            return jsonify({'authenticated': False}), 401
+    except jwt.ExpiredSignatureError:
+        return jsonify({'authenticated': False}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'authenticated': False}), 401
 
-            }),401
+# Ruta para obtener información del usuario autenticado
+@bp.route('/api/user/current', methods=['GET'])
+@login_required
+def get_current_user():
+    """
+    GET /api/user/current
+    Retorna información del usuario actual
+    Retorna JSON: { id: user_id, username: username, email: email }
+    """
+    try:
+        user_id = session.get('user_id')
+        
+        # Intentar obtener información adicional del usuario desde la base de datos
+        from models import User
+        user = User.query.get(user_id) if user_id else None
+        
+        if user:
+            # Usuario encontrado en la base de datos
+            return jsonify({
+                'id': str(user.id),
+                'username': user.username,
+                'email': user.email
+            })
+        else:
+            # Si no hay usuario en BD, devolver información de sesión
+            return jsonify({
+                'id': str(user_id) if user_id else 'anonymous',
+                'username': 'Anonymous'
+            })
+            
+    except Exception as e:
+        # Manejar errores inesperados
+        return jsonify({
+            'error': 'Error obteniendo información del usuario',
+            'detail': str(e)
+        }), 500
 
 
 

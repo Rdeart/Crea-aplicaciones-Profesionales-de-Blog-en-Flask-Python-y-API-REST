@@ -38,12 +38,12 @@ const Register = () => {
         <h1 className="text-3xl font-bold text-center mb-6">Crear Cuenta</h1>
         {error && <p className="text-red-500  text-center mb-4">{error}</p>}
 
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto">
+        <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md border border-gray-200">
             <div className="mb-4">
                 <label className="block text-gray-700">Nombre de Usuario</label>
                 <input
                 type="text"
-                className="w-full p-2 border-gray-300 rounded"
+                className="w-full p-2 border border-gray-300 rounded"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -53,23 +53,25 @@ const Register = () => {
                 <label className="block text-gray-700">Correo Electrónico</label>
                 <input
                 type="email"
-                className="w-full p-2 border-gray-300 rounded"
+                className="w-full p-2 border border-gray-300 rounded"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario@curelatam.com"
                 required
                 />
+                <p className="text-sm text-gray-500 mt-1">Solo se permiten correos corporativos autorizados</p>
             </div>
             <div className="mb-4">
                 <label className="block text-gray-700">Contraseña</label>
                 <input
                 type="password"
-                className="w-full p-2 border-gray-300 rounded"
+                className="w-full p-2 border border-gray-300 rounded"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 />                
             </div>
-            <button className="w-full bg-[#0081a1] text-white p-2 rounded hover:bg-[#58dbd6]">
+            <button className="w-full bg-[#0081a1] text-white p-2 rounded hover:bg-[#3caca8]">
                 Registrarse
             </button>
         </form>

@@ -10,6 +10,7 @@ export default function TagPage() {
     const [articles, setArticles] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [originalTagName, setOriginalTagName] = useState<string>('')
 
     useEffect(() => {
         if (!tag) return
@@ -25,6 +26,12 @@ export default function TagPage() {
                 }
                 const data = await res.json()
                 setArticles(data)
+                // Obtener el nombre original de la etiqueta del primer artículo
+                if (data.length > 0 && data[0].tag) {
+                    setOriginalTagName(data[0].tag)
+                } else {
+                    setOriginalTagName(tag)
+                }
             } catch (e: any) {
                 console.error(e)
                 setError(e.message || 'Error')
@@ -41,7 +48,7 @@ export default function TagPage() {
 
     return (
         <div className="container mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-6">Artículos: {tag}</h1>
+            <h1 className="text-3xl font-bold mb-6">Artículos: {originalTagName || tag}</h1>
             {articles.length === 0 ? (
                 <p>No se encontraron artículos para esta etiqueta.</p>
             ) : (

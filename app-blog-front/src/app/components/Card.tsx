@@ -28,7 +28,7 @@ const Card: React.FC<CardProps> = ({ id, deleteArticle}) => {
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#d33',
-          cancelButtonColor: '#3085d6',
+          cancelButtonColor: '#0081a1',
           confirmButtonText: 'Sí, eliminarlo!'
         }).then((result) => {{
 
@@ -58,70 +58,7 @@ const Card: React.FC<CardProps> = ({ id, deleteArticle}) => {
       </div>
 
       
-      <div className="absolute top-4 right-4 flex space-x-2">
-        {isAuthenticated && (
-          <>
-            {isAuthor && (
-              <button
-                type="button"
-                onClick={confirmDelete}
-                className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
-              >
-              <FontAwesomeIcon 
-                icon={faTrash} 
-                className="h-5 w-5 text-red-500  group-hover:scale-110 transition-all duration-300" 
-                />
-              </button>
-            )}
-
-                {isAuthor && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      try { (e.nativeEvent as any)?.stopImmediatePropagation(); } catch (err) {}
-                      openEditModal?.(article)
-                    }}
-                    className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
-                  >
-                    <FontAwesomeIcon
-                      icon={faEdit}
-                      className="h-5 w-5 text-gray-700 group-hover:scale-110 transition-all duration-300"
-                    />
-                  </button>
-                )}
-          </>
-        )}
-
-            <button
-               type="button"
-               onClick={(e) => {
-                 e.preventDefault();
-                 e.stopPropagation();
-                 // Stop any native/capture handlers that might trigger navigation
-                 try {
-                   (e.nativeEvent as any)?.stopImmediatePropagation();
-                 } catch (err) {}
-                 toggleFavorite(id);
-               }}
-               className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
-               >
-          {loadingFavorites && loadingFavorites.includes(id) ? (
-            <FontAwesomeIcon icon={faSpinner} className="h-5 w-5 text-gray-600 animate-spin" />
-          ) : (
-            <FontAwesomeIcon
-              icon={article.is_favorite ? fasHeart : farHeart}
-              className={`h-5 w-5 ${
-                article.is_favorite ? 'text-red-500' : 'text-gray-600'
-              } group-hover:scale-110 transition-all duration-300`}
-            />
-          )}
-        </button>
-
-      </div>
-
-      {/* Contenido */}
+      {/* Espacio vacío donde estaban los botones */}
       <div className="p-6 relative">
         {/* Etiqueta de categoría (dinámica según artículo) */}
         {/* Tag link uses a slugified, URL-friendly path */}
@@ -136,7 +73,17 @@ const Card: React.FC<CardProps> = ({ id, deleteArticle}) => {
           {article.title}
         </h2>
         <p className="text-gray-600 leading-relaxed mb-6">
-          {article.content.length > 150 ? `${article.content.slice(0, 150)}...` : article.content}
+          {(() => {
+            // Función para limpiar HTML y obtener solo texto
+            const cleanText = (html: string) => {
+              const div = document.createElement('div');
+              div.innerHTML = html;
+              return div.textContent || div.innerText || '';
+            };
+            
+            const plainText = cleanText(article.content);
+            return plainText.length > 150 ? `${plainText.slice(0, 150)}...` : plainText;
+          })()}
         </p>
 
 

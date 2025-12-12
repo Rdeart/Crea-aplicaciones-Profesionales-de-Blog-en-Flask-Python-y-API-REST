@@ -72,7 +72,7 @@
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
+      cancelButtonColor: '#0081a1',
       confirmButtonText: 'Sí, eliminarlo!',
       target: '#chat-window',
       customClass: {
@@ -109,7 +109,7 @@
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
+      cancelButtonColor: '#0081a1',
       confirmButtonText: 'Sí, eliminarlo!',
       target: '#chat-window',
       customClass: {

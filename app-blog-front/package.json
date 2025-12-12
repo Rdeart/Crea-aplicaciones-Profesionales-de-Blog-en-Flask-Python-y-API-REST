@@ -8,11 +8,23 @@
     "start": "next start"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-regular-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@fortawesome/react-fontawesome": "^3.1.0",
     "@heroicons/react": "^2.2.0",
+    "@n8n/chat": "^1.0.0",
+    "@tiptap/extension-color": "^3.11.1",
+    "@tiptap/extension-image": "^3.11.1",
+    "@tiptap/extension-text-align": "^3.11.1",
+    "@tiptap/extension-text-style": "^3.11.1",
+    "@tiptap/extension-underline": "^3.11.1",
+    "@tiptap/react": "^3.11.1",
+    "@tiptap/starter-kit": "^3.11.1",
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.3.0",
     "next": "15.5.4",
+    "quill": "^2.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sweetalert2": "^11.26.3"

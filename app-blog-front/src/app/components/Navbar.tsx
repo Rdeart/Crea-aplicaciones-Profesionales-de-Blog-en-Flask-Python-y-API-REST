@@ -24,7 +24,7 @@ const Navbar: React.FC<NavbarProps> = ({ articles, setFilteredArticles }) => {
     return (
         <nav className='bg-[#0081a1] text-white p-4'>
             <div className='container mx-auto flex justify-between items-center'>
-                <a href="/" className='text-xl font-bold whitespace-nowrap'><img src="/img/cure-conecta.png" alt="Logo" width="130" height="750"/></a>
+                <a href="/" className='text-xl font-bold whitespace-nowrap'><img src="/img/cure-conecta.png" alt="Logo" width="130" height="40" loading="lazy"/></a>
                 {setFilteredArticles && (
                     <div className='w-full max-w-md'>
                         <SearchBar articles={articles} setFilteredArticles={setFilteredArticles} />
@@ -60,7 +60,7 @@ const Navbar: React.FC<NavbarProps> = ({ articles, setFilteredArticles }) => {
                             <li>
                                 <button onClick={openCreateModal} className='flex items-center hover:text-gray-300'>
                                     <FontAwesomeIcon icon={faPlusCircle} className='mr-2 h-6 w-6' />
-                                    Crear Articulo
+                                    Crear Artículo
                                 </button>
                             </li>
                         </>
@@ -69,7 +69,7 @@ const Navbar: React.FC<NavbarProps> = ({ articles, setFilteredArticles }) => {
                         <li>
                             <Link href="/pages/login" className='flex items-center hover:text-gray-300'>
                                 <FontAwesomeIcon icon={faSignInAlt} className='mr-2 h-6 w-6' />
-                                Iniciar Sesion
+                                Iniciar Sesión
                             </Link>
                         </li>
                     ) : (
@@ -78,7 +78,7 @@ const Navbar: React.FC<NavbarProps> = ({ articles, setFilteredArticles }) => {
                                 onClick={logout}
                                 className='flex items-center hover:text-gray-300'>
                                 <FontAwesomeIcon icon={faSignInAlt} className='mr-2 h-6 w-6' />
-                                Cerrar Sesion
+                                Cerrar Sesión
                             </button>
                         </li>
                     )}

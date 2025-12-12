@@ -1,6 +1,7 @@
 from flask import Flask, render_template
 from models import db
 from flask_cors import CORS
+from flask_mail import Mail
 import os
 import logging
 from sqlalchemy import text
@@ -41,7 +42,7 @@ except ImportError:
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
     app.secret_key = 'rdeart_super_secret_key_2025'
     # Ensure instance folder exists and use absolute DB path to avoid SQLite open errors
     instance_dir = os.path.join(os.path.dirname(__file__), 'instance')
@@ -52,11 +53,25 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Cookie configuration for CORS
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # None para CORS
     app.config['SESSION_COOKIE_SECURE'] = False  # False para HTTP en desarrollo
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = False  # False para que JavaScript pueda acceder
+    app.config['SESSION_COOKIE_DOMAIN'] = None  # None para localhost
+
+    # Configuración de correo
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_USERNAME'] = 'a.audiovisual@curelatam.com'
+    app.config['MAIL_PASSWORD'] = 'tu-contraseña-de-aplicación'  # Cambiar por tu contraseña de aplicación
+    app.config['MAIL_DEFAULT_SENDER'] = 'a.audiovisual@curelatam.com'
 
     db.init_app(app)
+    
+    # Inicializar Flask-Mail
+    from services.email_service import mail
+    mail.init_app(app)
 
     CORS(app,
         supports_credentials=True,
@@ -65,8 +80,9 @@ def create_app():
             'http://127.0.0.1:3000',
             'http://192.10.2.191:3000',
             'http://192.10.2.141:3000',
+            'http://192.10.2.160:3000',
         ],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Authorization", "Set-Cookie"],
         expose_headers=["Set-Cookie"],
         methods=["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"])
 
@@ -120,6 +136,14 @@ def create_app():
                     print('[startup] photo_url missing, attempting ALTER TABLE to add it')
                     db.session.execute(text("ALTER TABLE user ADD COLUMN photo_url TEXT;"))
                     db.session.commit()
+                if 'reset_token' not in user_columns:
+                    print('[startup] reset_token missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN reset_token VARCHAR(255);"))
+                    db.session.commit()
+                if 'reset_token_expires' not in user_columns:
+                    print('[startup] reset_token_expires missing, attempting ALTER TABLE to add it')
+                    db.session.execute(text("ALTER TABLE user ADD COLUMN reset_token_expires DATETIME;"))
+                    db.session.commit()
         except SQLAlchemyError:
             # If anything fails here, avoid crashing the app on startup but log error
             logging.exception('[startup] Error ensuring DB columns')
@@ -129,10 +153,16 @@ def create_app():
                 pass
 
 
-    from routes import auth_roustes, article_routes, chat_routes
+    from routes import auth_roustes, article_routes
+    from routes.chatbot_comercial import bp_comercial
+    from routes.chatbot_capacitacion import bp_capacitacion
+    from routes.password_reset_routes import bp
+    
     app.register_blueprint(auth_roustes.bp)
     app.register_blueprint(article_routes.bp)
-    app.register_blueprint(chat_routes.bp)
+    app.register_blueprint(bp_comercial)
+    app.register_blueprint(bp_capacitacion)
+    app.register_blueprint(bp, url_prefix='/api')
 
     # Root route to serve the chat UI template
     @app.route('/')

@@ -3,6 +3,11 @@ import React, { useEffect, useState, use } from "react";
 import { useArticles } from "@/src/context/ArticleProvider";
 import { Article } from "@/src/types/article";
 import { useAuth } from "@/src/context/AuthProvider";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faTrash, faHeart as fasHeart, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faHeart as farHeart } from '@fortawesome/free-regular-svg-icons';
+import Swal from 'sweetalert2';
+import { useRouter } from 'next/navigation';
 
 type CommentItem = {
   id: number;
@@ -16,9 +21,11 @@ type CommentItem = {
   userReaction?: 'heart' | 'like' | 'laugh' | null;
 };
 
-const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
-  const { fetchArticleById } = useArticles();
-  const { username, userId } = useAuth();
+const ArticlePage: React.FC<{ params: Promise<{ id: string }> }> = ({ params }) => {
+  const { fetchArticleById, deleteArticle, openEditModal, toggleFavorite, loadingFavorites } = useArticles();
+  const { username, userId, isAuthenticated } = useAuth();
+  console.log('Auth state:', { username, userId, isAuthenticated });
+  const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
   const [articleId, setArticleId] = useState<number | null>(null);
 
@@ -80,6 +87,14 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
       try {
         if (src.startsWith('data:')) {
           setPdfSrc(src);
+          setPdfLoading(false);
+          return;
+        }
+
+        // Si es una URL local del backend, usarla directamente sin proxy
+        if (src.startsWith('/static/') || src.startsWith('http://localhost:5000/')) {
+          const fullUrl = src.startsWith('/static/') ? `http://localhost:5000${src}` : src;
+          setPdfSrc(fullUrl);
           setPdfLoading(false);
           return;
         }
@@ -316,10 +331,16 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
     if (!articleId) return;
     if (!userId) { alert('Inicia sesión para reaccionar'); return; }
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       await fetch(`http://localhost:5000/article/${articleId}/reactions`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ type }),
       });
       const rRes = await fetch(`http://localhost:5000/article/${articleId}/reactions`, { credentials: 'include' });
@@ -337,8 +358,17 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
     if (!articleId) return;
     if (!userId) { alert('Inicia sesión para reaccionar a comentarios'); return; }
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       await fetch(`http://localhost:5000/article/${articleId}/comments/${commentId}/reactions`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type })
+        method: 'POST', 
+        credentials: 'include', 
+        headers, 
+        body: JSON.stringify({ type })
       });
       const r = await fetch(`http://localhost:5000/article/${articleId}/comments/${commentId}/reactions`, { credentials: 'include' });
       if (r.ok) {
@@ -356,8 +386,17 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
   const saveEdit = async (id: number) => {
     if (!articleId) return;
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const res = await fetch(`http://localhost:5000/article/${articleId}/comments/${id}`, {
-        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: editingText })
+        method: 'PUT', 
+        credentials: 'include', 
+        headers, 
+        body: JSON.stringify({ text: editingText })
       });
       if (res.ok) {
         const updated = await res.json();
@@ -374,12 +413,60 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
 
   const deleteComment = async (id: number) => {
     if (!articleId) return;
-    if (!confirm('¿Eliminar este comentario?')) return;
+    
+    const result = await Swal.fire({
+      title: '¿Eliminar comentario?',
+      text: 'Esta acción no se puede deshacer',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true
+    });
+    
+    if (!result.isConfirmed) return;
+    
     try {
-      const res = await fetch(`http://localhost:5000/article/${articleId}/comments/${id}`, { method: 'DELETE', credentials: 'include' });
-      if (res.ok) setComments(prev => prev.filter(c => c.id !== id));
-      else { const err = await res.json().catch(() => ({})); alert(err.error || 'No autorizado'); }
-    } catch (err) { console.error(err); }
+      const token = localStorage.getItem('auth_token');
+      const headers: any = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const res = await fetch(`http://localhost:5000/article/${articleId}/comments/${id}`, { 
+        method: 'DELETE', 
+        credentials: 'include',
+        headers
+      });
+      if (res.ok) {
+        setComments(prev => prev.filter(c => c.id !== id));
+        await Swal.fire({
+          title: 'Eliminado',
+          text: 'El comentario ha sido eliminado',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        await Swal.fire({
+          title: 'Error',
+          text: err.error || 'No autorizado para eliminar este comentario',
+          icon: 'error',
+          confirmButtonColor: '#3085d6'
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      await Swal.fire({
+        title: 'Error',
+        text: 'Hubo un error al eliminar el comentario',
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    }
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -387,8 +474,17 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
     if (!articleId) return;
     const text = newComment.trim(); if (!text) return;
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: any = {'Content-Type':'application/json'};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const res = await fetch(`http://localhost:5000/article/${articleId}/comments`, {
-        method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text, username: username || 'Anónimo' })
+        method: 'POST', 
+        credentials: 'include', 
+        headers, 
+        body: JSON.stringify({ text, username: username || 'Anónimo' })
       });
       if (res.ok) {
         const created = await res.json();
@@ -402,7 +498,7 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
 
   const canModify = (commentUserId: number | null, commentAnonId?: string | null) => {
     // Solo el autor puede modificar: si existe userId se compara, si es anónimo se asume backend validará por session anon_id
-    return commentUserId !== null && userId !== null && commentUserId === userId;
+    return userId !== null && commentUserId !== null && commentUserId === userId;
   };
 
   const formatDate = (iso?: string | null) => {
@@ -418,15 +514,105 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
     }
   };
 
+  // Funciones para Editar y Eliminar artículo
+  const handleEdit = () => {
+    if (article && openEditModal) {
+      openEditModal(article);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!article) return;
+    
+    Swal.fire({
+      title: '¿Estás seguro?',
+      text: "¡No podrás revertir esto!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#0081a1',
+      confirmButtonText: 'Sí, eliminarlo!'
+    }).then((result) => {
+      if (result.isConfirmed && articleId) {
+        deleteArticle(articleId);
+        Swal.fire({
+          title: "Eliminado",
+          text: 'El artículo ha sido eliminado.',
+          icon: "success"
+        }).then(() => {
+          router.push('/');
+        });
+      }
+    });
+  };
+
+  const isAuthor = userId && article && userId === article.user_id;
+
   if (!article) return <p className="text-4xl font-bold mb-6">Cargando artículo...</p>;
 
   return (
     <div className="news-layout">
       <main className="news-content">
-        {article.image_url && <figure className="news-image"><img src={article.image_url} alt={article.title} /></figure>}
+        {article.image_url && (
+          <figure className="news-image relative">
+            <img src={article.image_url} alt={article.title} />
+            {/* Botones de Editar, Eliminar y Favoritos sobre la imagen */}
+            {(isAuthor || isAuthenticated) && (
+              <div className="absolute top-4 right-4 z-10 flex space-x-2">
+                {isAuthenticated && (
+                  <button
+                    onClick={() => toggleFavorite(articleId!)}
+                    className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
+                    title="Añadir a favoritos"
+                  >
+                    {loadingFavorites && loadingFavorites.includes(articleId!) ? (
+                      <FontAwesomeIcon icon={faSpinner} className="h-5 w-5 text-gray-600 animate-spin" />
+                    ) : (
+                      <FontAwesomeIcon
+                        icon={article?.is_favorite ? fasHeart : farHeart}
+                        className={`h-5 w-5 ${
+                          article?.is_favorite ? 'text-red-500' : 'text-gray-600'
+                        } group-hover:scale-110 transition-all duration-300`}
+                      />
+                    )}
+                  </button>
+                )}
+                {isAuthor && (
+                  <button
+                    onClick={handleEdit}
+                    className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
+                    title="Editar artículo"
+                  >
+                    <FontAwesomeIcon 
+                      icon={faEdit} 
+                      className="h-5 w-5 text-gray-700 group-hover:scale-110 transition-all duration-300" 
+                    />
+                  </button>
+                )}
+                {isAuthor && (
+                  <button
+                    onClick={handleDelete}
+                    className="bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:bg-white transition-all duration-300 group"
+                    title="Eliminar artículo"
+                  >
+                    <FontAwesomeIcon 
+                      icon={faTrash} 
+                      className="h-5 w-5 text-red-500 group-hover:scale-110 transition-all duration-300" 
+                    />
+                  </button>
+                )}
+              </div>
+            )}
+          </figure>
+        )}
         <h1 className="news-title">{article.title}</h1>
         <div className="news-meta">Publicado: {article.created_at} | Autor: {article.author}</div>
-        <article className="news-body">{article.content && article.content.split('\n').map((line, i) => <p key={i} className="mb-2">{line}</p>)}</article>
+        <article 
+          className="news-body"
+          dangerouslySetInnerHTML={{ 
+            __html: article.content || ''
+          }}
+        />
 
         {article.pdf_url && (
           <div className="mt-6">
@@ -565,7 +751,7 @@ const ArticlePage: React.FC<{ params: { id: string } }> = ({ params }) => {
               {canModify(c.userId) && editingId !== c.id && (
                 <div className="comment-controls">
                   <button className="btn-reply" onClick={() => startEdit(c.id, c.text)}>Editar</button>
-                  <button className="btn-reply" onClick={() => deleteComment(c.id)}>Eliminar</button>
+                  <button style={{backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}} onClick={() => deleteComment(c.id)}>Eliminar</button>
                 </div>
               )}
             </div>

@@ -1,5 +1,17 @@
 import { Article } from "@/src/types/article";
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from 'next/dynamic';
+
+// Importar SimpleEditor
+const SimpleEditor = dynamic(() => import('./SimpleEditor'), { 
+  ssr: false,
+  loading: () => <div>Cargando editor...</div>
+});
+
+// Importar TestEditor para diagnóstico
+const TestEditor = dynamic(() => import('./TestEditor'), { 
+  ssr: false
+});
 
 interface CreateArticleModalProps {
         onClose: () => void;
@@ -10,7 +22,7 @@ interface CreateArticleModalProps {
 export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({ onClose, onSubmit, initial = null }) => {
 
  const [title, setTitle] = useState(initial?.title || '')
- const [content, setContent] = useState(initial?.content || '')
+ const [content, setContent] = useState('')
  const [imageUrl, setImageUrl] = useState(initial?.image_url || '')
  const [filePreview, setFilePreview] = useState<string | null>(initial?.image_url || null)
  const [pdfUrl, setPdfUrl] = useState<string | null>(initial?.pdf_url || null)
@@ -34,47 +46,20 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({ onClose,
         }
  }, [initial])
 
-    // Prevent background (page) from scrolling while modal is open.
-    // Allow scroll only inside the modal content area (`contentRef`).
+    // Allow scrolling in the modal
     const contentRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
+        // No bloquear el scroll para que el usuario pueda navegar
+        // Solo mantener el fondo estático
         const prevBodyOverflow = document.body.style.overflow
         const prevHtmlOverflow = document.documentElement.style.overflow
         document.body.style.overflow = 'hidden'
         document.documentElement.style.overflow = 'hidden'
 
-        const onWheel = (e: WheelEvent) => {
-            const el = contentRef.current
-            if (!el) {
-                e.preventDefault()
-                return
-            }
-            // Allow wheel only if it originated inside the modal content. Otherwise block it.
-            if (!el.contains(e.target as Node)) {
-                e.preventDefault()
-            }
-        }
-
-        const onTouchMove = (e: TouchEvent) => {
-            const el = contentRef.current
-            if (!el) {
-                e.preventDefault()
-                return
-            }
-            if (!el.contains(e.target as Node)) {
-                e.preventDefault()
-            }
-        }
-
-        window.addEventListener('wheel', onWheel, { passive: false })
-        window.addEventListener('touchmove', onTouchMove, { passive: false })
-
         return () => {
             document.body.style.overflow = prevBodyOverflow || ''
             document.documentElement.style.overflow = prevHtmlOverflow || ''
-            window.removeEventListener('wheel', onWheel)
-            window.removeEventListener('touchmove', onTouchMove)
         }
     }, [])
 
@@ -220,7 +205,7 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({ onClose,
             return
         }
         // Preferir la imagen subida/portada (`imageUrl`) sobre la miniatura autogenerada
-        const payload: Partial<Article> = { title, content, image_url: imageUrl || thumbnailUrl || null, tag }
+        const payload: Partial<Article> = { title, content, image_url: imageUrl || thumbnailUrl || undefined, tag }
         if (pdfUrl) payload.pdf_url = pdfUrl
         if (videoUrl) payload.video_url = videoUrl
         await onSubmit(payload)
@@ -230,11 +215,11 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({ onClose,
     const kindLabel = initial?.tag && /not/i.test(initial.tag) ? 'Noticia' : 'Artículo'
 
     return (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white p-4 rounded-lg shadow-lg max-w-3xl w-full min-h-[60vh] max-h-[95vh] flex flex-col overflow-hidden z-50">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" style={{overflowY: 'auto'}}>
+            <div className="bg-white p-4 rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden z-50">
                 <h2 className="text-2xl font-bold mb-3 px-2">{initial ? `Editar ${kindLabel}` : 'Crear Nuevo Artículo'}</h2>
               <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                  <div ref={contentRef} className="flex-1 overflow-auto px-2 pb-4">
+                  <div ref={contentRef} className="flex-1 overflow-y-auto px-2 pb-4" style={{maxHeight: 'calc(90vh - 200px)'}}>
                   <div className="mb-4">
                         <label className="block text-gray-700 ">Título</label>
                         <input 
@@ -247,12 +232,12 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({ onClose,
                   </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 ">Contenido</label>
-                    <textarea
-                        className="w-full p-3 border border-gray-300 rounded h-48 md:h-64 resize-y"
-                        rows={10}
-                        value={content.replace(/\\n/g, '\n')}
-                        onChange={(e) => setContent(e.target.value)}
-                    />
+                    <div className="border border-gray-300 rounded">
+                        <SimpleEditor
+                            content={content}
+                            onChange={setContent}
+                        />
+                    </div>
 
                     <div className="mt-3">
                         <label className="inline-block text-sm text-gray-700 mr-2">O subir PDF en contenido (opcional):</label>

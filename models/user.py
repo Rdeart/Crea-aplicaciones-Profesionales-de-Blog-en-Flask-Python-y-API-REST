@@ -1,5 +1,6 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db
+import datetime
 
 
 
@@ -14,6 +15,8 @@ class User(db.Model):
     last_name = db.Column(db.String(120), nullable=True)
     area = db.Column(db.String(150), nullable=True)
     photo_url = db.Column(db.Text, nullable=True)
+    reset_token = db.Column(db.String(255), nullable=True)
+    reset_token_expires = db.Column(db.DateTime, nullable=True)
     articles = db.relationship('Article', backref='author', lazy=True)
 
 

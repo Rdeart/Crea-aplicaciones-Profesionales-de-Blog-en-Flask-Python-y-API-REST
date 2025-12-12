@@ -1,4 +1,4 @@
-from flask import jsonify, session
+from flask import jsonify, session, request
 from models.article import Article
 from models.favorite import Favorite
 from models.user import User
@@ -9,6 +9,7 @@ import urllib.error
 import base64
 import re
 import logging
+import jwt
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 
@@ -94,15 +95,14 @@ def _generate_pdf_thumbnail_dataurl(pdf_src: str, target_width: int = 800) -> Op
 
 
 
-def update_article(article_id, data):
+def update_article(article_id, data, user_id):
     # Require authenticated user
-    current_user = session.get('user_id')
-    if not current_user:
+    if not user_id:
         return jsonify({'error': 'Usuario no autenticado'}), 401
 
     article = Article.query.get_or_404(article_id)
     # Only the author can update
-    if article.user_id != current_user:
+    if article.user_id != user_id:
         return jsonify({'error': 'No autorizado para editar este artículo'}), 403
 
     # Update fields safely
@@ -148,13 +148,13 @@ def update_article(article_id, data):
         'user_id': article.user_id
     })
 
-def delete_article(article_id):
-    if 'user_id' not in session:
+def delete_article(article_id, user_id):
+    if not user_id:
         return jsonify({'message': 'No autorizado'}), 401
     
     article = Article.query.get_or_404(article_id)
 
-    if article.user_id != session['user_id']:
+    if article.user_id != user_id:
         return jsonify({'message': 'No autorizado para eliminar este articulo'}), 403
     
     try:
@@ -265,7 +265,18 @@ def get_all_articles(search_term=None, tag=None, tag_slug=None):
     norm_search = _normalize_text(search_term) if search_term else None
     norm_tag = _normalize_text(tag) if tag else None
     norm_tag_slug = tag_slug if tag_slug else None
-    current_user = session.get('user_id')
+    
+    # Get current user from token
+    current_user = None
+    token = request.headers.get('Authorization')
+    if token and token.startswith('Bearer '):
+        token = token[7:]
+        try:
+            decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+            current_user = decoded['user_id']
+        except jwt.InvalidTokenError:
+            pass
+    
     result = []
     for article in articles:
         # If tag_slug provided, compare slugified article.tag
@@ -312,75 +323,94 @@ def get_all_articles(search_term=None, tag=None, tag_slug=None):
         })
     return jsonify(result)
 
-def toggle_favorite(article_id):
-    # Toggle favorite for the current user and the given article
-    user_id = session.get('user_id')
-    if not user_id:
+
+def get_favorites():
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        # Join Favorite -> Article for the given user
+        favorites = Favorite.query.filter_by(user_id=user_id).all()
+        articles_list = []
+        for fav in favorites:
+            article = Article.query.get(fav.article_id)
+            if not article:
+                continue
+            articles_list.append({
+                'id': article.id,
+                'title': article.title,
+                'content': article.content,
+                'image_url': article.image_url,
+                'pdf_url': article.pdf_url,
+                'tag': article.tag,
+                'created_at': article.created_at.strftime('%d-%m-%Y') if article.created_at else None,
+                'is_favorite': True
+            })
 
-    article = Article.query.get_or_404(article_id)
-    # Check if favorite exists
-    fav = Favorite.query.filter_by(user_id=user_id, article_id=article.id).first()
-    if fav:
-        # remove favorite
-        try:
-            db.session.delete(fav)
-            db.session.commit()
-            # Also remove any notification previously created for this favorite
+        return jsonify(articles_list), 200
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
+
+
+def toggle_favorite(article_id):
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'error': 'Usuario no autenticado'}), 401
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        article = Article.query.get_or_404(article_id)
+        # Check if favorite exists
+        fav = Favorite.query.filter_by(user_id=user_id, article_id=article.id).first()
+        if fav:
+            # remove favorite
             try:
-                Notification.query.filter_by(user_id=article.user_id, actor_id=user_id, type='favorite', article_id=article.id).delete()
+                db.session.delete(fav)
                 db.session.commit()
-            except SQLAlchemyError:
-                db.session.rollback()
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            return jsonify({'error': str(e)}), 500
-        return jsonify({'message': 'Favorito eliminado'}), 200
-    else:
-        # create favorite
-        try:
-            new_fav = Favorite(user_id=user_id, article_id=article.id)
-            db.session.add(new_fav)
-            db.session.commit()
-            # Create a notification for the article author (if not favoriting own article)
-            try:
-                if article.user_id and article.user_id != user_id:
-                    notif = Notification(
-                        user_id=article.user_id,
-                        actor_id=user_id,
-                        type='favorite',
-                        article_id=article.id
-                    )
-                    db.session.add(notif)
+                # Also remove any notification previously created for this favorite
+                try:
+                    Notification.query.filter_by(user_id=article.user_id, actor_id=user_id, type='favorite', article_id=article.id).delete()
                     db.session.commit()
-            except SQLAlchemyError:
+                except SQLAlchemyError:
+                    db.session.rollback()
+            except SQLAlchemyError as e:
                 db.session.rollback()
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            return jsonify({'error': str(e)}), 500
-        return jsonify({'message': 'Favorito agregado'}), 201
-
-
-def get_favorites(user_id):
-    if not user_id:
-        return jsonify({'error': 'El usuario no está autenticado o el ID de usuario no está en la sesión'}), 401
-
-    # Join Favorite -> Article for the given user
-    favorites = Favorite.query.filter_by(user_id=user_id).all()
-    articles_list = []
-    for fav in favorites:
-        article = Article.query.get(fav.article_id)
-        if not article:
-            continue
-        articles_list.append({
-            'id': article.id,
-            'title': article.title,
-            'content': article.content,
-            'image_url': article.image_url,
-            'pdf_url': article.pdf_url,
-            'tag': article.tag,
-            'created_at': article.created_at.strftime('%d-%m-%Y') if article.created_at else None,
-            'is_favorite': True
-        })
-
-    return jsonify(articles_list), 200
+                return jsonify({'error': str(e)}), 500
+            return jsonify({'message': 'Favorito eliminado'}), 200
+        else:
+            # create favorite
+            try:
+                new_fav = Favorite(user_id=user_id, article_id=article.id)
+                db.session.add(new_fav)
+                db.session.commit()
+                # Create a notification for the article author (if not favoriting own article)
+                try:
+                    if article.user_id and article.user_id != user_id:
+                        notif = Notification(
+                            user_id=article.user_id,
+                            actor_id=user_id,
+                            type='favorite',
+                            article_id=article.id
+                        )
+                        db.session.add(notif)
+                        db.session.commit()
+                except SQLAlchemyError:
+                    db.session.rollback()
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                return jsonify({'error': str(e)}), 500
+            return jsonify({'message': 'Favorito agregado'}), 201
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401

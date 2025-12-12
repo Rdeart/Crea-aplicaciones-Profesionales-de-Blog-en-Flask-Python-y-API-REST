@@ -5,6 +5,7 @@ import urllib.error
 import urllib.parse
 import base64
 import uuid
+import jwt
 from models import db, Comment, Reaction, CommentReaction, Notification
 from models.article import Article
 from datetime import datetime
@@ -21,14 +22,50 @@ bp = Blueprint('articles', __name__)
 # Actualizamos un articulo
 @bp.route('/articles/<int:article_id>', methods=['PUT'])
 def update_article_route(article_id):
+    # Verificar autenticación por sesión o token JWT
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        # Si no hay sesión, verificar token JWT
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'error': 'Usuario no autenticado'}), 401
+        
+        if token.startswith('Bearer '):
+            token = token[7:]
+        
+        try:
+            decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+            user_id = decoded['user_id']
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Token inválido'}), 401
+    
     data = request.get_json()
-    return update_article(article_id, data)
+    return update_article(article_id, data, user_id)
 
 
 # Eliminamos un articulo
 @bp.route('/articles/<int:article_id>', methods=['DELETE'])
 def delete_article_route(article_id):
-    return delete_article(article_id)
+    # Verificar autenticación por sesión o token JWT
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        # Si no hay sesión, verificar token JWT
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'error': 'Usuario no autenticado'}), 401
+        
+        if token.startswith('Bearer '):
+            token = token[7:]
+        
+        try:
+            decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+            user_id = decoded['user_id']
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Token inválido'}), 401
+    
+    return delete_article(article_id, user_id)
 
 
 
@@ -42,7 +79,22 @@ def view_article_route(article_id):
 @bp.route('/articles', methods=['POST'])
 def create_article_route():
     data = request.get_json()
+    
+    # Primero intentar obtener user_id de la sesión
     user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
     return create_article(data, user_id)
 
 
@@ -68,10 +120,7 @@ def toggle_favorite_route(article_id):
 
 @bp.route('/favorites', methods=['GET'])
 def get_favorites_route():
-    user_id = session.get('user_id')
-    
-    return get_favorites(user_id)
-
+    return get_favorites()
 
 
 @bp.route('/proxy')
@@ -255,8 +304,22 @@ def post_comment(article_id):
     text = data.get('text')
     if not text or not text.strip():
         return jsonify({'error': 'El texto del comentario es requerido'}), 400
-    # Requerir que el usuario haya iniciado sesión para comentar
+    
+    # Primero intentar obtener user_id de la sesión
     user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
     if not user_id:
         return jsonify({'error': 'Debe iniciar sesión para comentar'}), 403
 
@@ -282,8 +345,22 @@ def edit_comment(article_id, comment_id):
     if not c or c.article_id != article_id:
         return jsonify({'error': 'Comentario no encontrado'}), 404
 
-    # Solo el autor (usuario autenticado) puede editar
+    # Primero intentar obtener user_id de la sesión
     user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
+    # Solo el autor (usuario autenticado) puede editar
     if not user_id or not c.user_id or c.user_id != user_id:
         return jsonify({'error': 'No autorizado'}), 403
 
@@ -303,8 +380,23 @@ def delete_comment(article_id, comment_id):
     c = Comment.query.get(comment_id)
     if not c or c.article_id != article_id:
         return jsonify({'error': 'Comentario no encontrado'}), 404
-    # Solo el autor (usuario autenticado) puede eliminar
+    
+    # Primero intentar obtener user_id de la sesión
     user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
+    # Solo el autor (usuario autenticado) puede eliminar
     if not user_id or not c.user_id or c.user_id != user_id:
         return jsonify({'error': 'No autorizado'}), 403
 
@@ -339,8 +431,22 @@ def post_reaction(article_id):
     rtype = data.get('type')
     if rtype not in ('like', 'laugh', 'heart'):
         return jsonify({'error': 'Tipo de reacción inválido'}), 400
-    # Requerir que el usuario haya iniciado sesión para reaccionar
+    
+    # Primero intentar obtener user_id de la sesión
     user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
     if not user_id:
         return jsonify({'error': 'Debe iniciar sesión para reaccionar'}), 403
 
@@ -493,63 +599,99 @@ def post_comment_reaction(article_id, comment_id):
 # --- Endpoints de notificaciones ---
 @bp.route('/notifications', methods=['GET'])
 def get_notifications():
-    user_id = session.get('user_id')
-    if not user_id:
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
-    # Fetch notifications and enrich with actor username and article title for better UI
-    notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
-    enriched = []
-    from models.user import User
-    for n in notifs:
-        actor_username = None
-        article_title = None
-        actor_photo = None
-        article_thumb = None
-        try:
-            if n.actor_id:
-                a = User.query.get(n.actor_id)
-                if a:
-                    actor_username = a.username
-                    try:
-                        actor_photo = a.photo_url
-                    except AttributeError:
-                        actor_photo = None
-        except SQLAlchemyError:
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        # Fetch notifications and enrich with actor username and article title for better UI
+        notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
+        enriched = []
+        from models.user import User
+        for n in notifs:
             actor_username = None
-        try:
-            if n.article_id:
-                art = Article.query.get(n.article_id)
-                if art:
-                    article_title = art.title
-                    try:
-                        article_thumb = art.image_url
-                    except AttributeError:
-                        article_thumb = None
-        except SQLAlchemyError:
             article_title = None
-        d = n.to_dict()
-        d['actor_username'] = actor_username
-        d['actor_photo_url'] = actor_photo
-        d['article_title'] = article_title
-        d['article_thumbnail_url'] = article_thumb
-        enriched.append(d)
-    return jsonify(enriched)
+            actor_photo = None
+            article_thumb = None
+            try:
+                if n.actor_id:
+                    a = User.query.get(n.actor_id)
+                    if a:
+                        actor_username = a.username
+                        try:
+                            actor_photo = a.photo_url
+                        except AttributeError:
+                            actor_photo = None
+            except SQLAlchemyError:
+                actor_username = None
+            try:
+                if n.article_id:
+                    art = Article.query.get(n.article_id)
+                    if art:
+                        article_title = art.title
+                        try:
+                            article_thumb = art.image_url
+                        except AttributeError:
+                            article_thumb = None
+            except SQLAlchemyError:
+                article_title = None
+            d = n.to_dict()
+            d['actor_username'] = actor_username
+            d['actor_photo_url'] = actor_photo
+            d['article_title'] = article_title
+            d['article_thumbnail_url'] = article_thumb
+            enriched.append(d)
+        return jsonify(enriched)
+    
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
 
 
 @bp.route('/notifications/unread_count', methods=['GET'])
 def notifications_unread_count():
-    user_id = session.get('user_id')
-    if not user_id:
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
-    cnt = Notification.query.filter_by(user_id=user_id, is_read=False).count()
-    return jsonify({'unread': cnt})
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        cnt = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+        return jsonify({'unread': cnt})
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
 
 
 @bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
 def mark_notification_read(notification_id):
-    user_id = session.get('user_id')
-    if not user_id:
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        import jwt
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expirado'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
+    
     n = Notification.query.get(notification_id)
     if not n or n.user_id != user_id:
         return jsonify({'error': 'Notificación no encontrada'}), 404
@@ -558,9 +700,57 @@ def mark_notification_read(notification_id):
     return jsonify(n.to_dict())
 
 
+@bp.route('/notifications/<int:notification_id>/click', methods=['POST'])
+def click_notification(notification_id):
+    """
+    Marca una notificación como leída y la elimina automáticamente
+    Simula el comportamiento de hacer clic en una notificación
+    """
+    # Primero intentar obtener user_id de la sesión
+    user_id = session.get('user_id')
+    
+    # Si no hay sesión, intentar con token JWT
+    if not user_id:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            try:
+                import jwt
+                token = token[7:]
+                decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+                user_id = decoded['user_id']
+            except jwt.InvalidTokenError:
+                pass
+    
+    if not user_id:
+        return jsonify({'error': 'Usuario no autenticado'}), 401
+    
+    n = Notification.query.get(notification_id)
+    if not n or n.user_id != user_id:
+        return jsonify({'error': 'Notificación no encontrada'}), 404
+    
+    # Guardar información de redirección antes de eliminar
+    redirect_info = None
+    if n.article_id:
+        redirect_info = {'type': 'article', 'id': n.article_id}
+    elif n.comment_id:
+        redirect_info = {'type': 'comment', 'id': n.comment_id}
+    
+    # Eliminar la notificación
+    db.session.delete(n)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'redirect': redirect_info,
+        'message': 'Notificación eliminada automáticamente'
+    })
+
+
 @bp.route('/notifications/<int:notification_id>', methods=['DELETE'])
 def delete_notification(notification_id):
     user_id = session.get('user_id')
+    # TODO: Restaurar autenticación cuando se solucione el problema del token
+    
     if not user_id:
         return jsonify({'error': 'Usuario no autenticado'}), 401
     n = Notification.query.get(notification_id)

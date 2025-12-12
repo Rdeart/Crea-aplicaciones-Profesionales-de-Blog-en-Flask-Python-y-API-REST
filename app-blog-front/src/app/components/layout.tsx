@@ -5,7 +5,13 @@ import Footer from "./footer";
 import ChatWidget from "./ChatWidget";
 import { useArticles } from "@/src/context/ArticleProvider";
 import FullPagePreloader from "./FullPagePreloader";
-import { CreateArticleModal } from "./CreateArticleModal";
+import dynamic from 'next/dynamic';
+
+// Importar CreateArticleModal dinámicamente para evitar SSR issues
+const CreateArticleModal = dynamic(() => import('./CreateArticleModal').then(mod => ({ default: mod.CreateArticleModal })), {
+  ssr: false,
+  loading: () => null
+});
 
 
 
@@ -44,7 +50,7 @@ const Layout: React.FC<LayoutProps> = ({children}) => {
                         }
                         return await createArticle(data)
                     }}
-                    initial={editArticle}
+                    initial={editArticle || null}
                 />
             )}
             

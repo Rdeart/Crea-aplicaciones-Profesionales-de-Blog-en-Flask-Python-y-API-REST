@@ -1,15 +1,25 @@
-from flask import jsonify, session
+from flask import jsonify, session, request
 from models.user import User 
-from models import db 
-
+from models import db
+import jwt
+import datetime 
+from config.corporate_domains import is_corporate_email
 
 def register_user(data):
-    if User.query.filter_by(email=data['email']).first() is not None:
+    email = data.get('email', '').lower()
+    
+    # Validar que el email sea corporativo
+    if not is_corporate_email(email):
+        return jsonify({
+            'error': 'Solo se permiten correos corporativos. Contacte al administrador para más información.'
+        }), 403
+    
+    if User.query.filter_by(email=email).first() is not None:
         return jsonify({
             'error': 'El email ya esta registrado'
         }), 400
     
-    new_user = User(username=data['username'], email=data['email'])
+    new_user = User(username=data['username'], email=email)
     new_user.set_password(data['password'])
     db.session.add(new_user)
     db.session.commit()
@@ -20,9 +30,20 @@ def register_user(data):
 def login_user(data):
     user = User.query.filter_by(email=data['email']).first()
     if user and user.check_password(data['password']):
+        # Establecer user_id en la sesión para comentarios
         session['user_id'] = user.id
         
-        return jsonify({'message': 'Inicio de sesion exitoso'}), 200
+        token = jwt.encode({
+            'user_id': user.id,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        }, 'rdeart_super_secret_key_2025', algorithm='HS256')
+        
+        return jsonify({
+            'message': 'Inicio de sesion exitoso',
+            'token': token,
+            'user_id': user.id,
+            'username': user.username
+        }), 200
     else:
         return jsonify({'error': 'Credenciales invalidas'}), 401
     
@@ -30,44 +51,65 @@ def logout_user():
     session.pop('user_id', None)
     return jsonify({'message':'Sesion cerrada con exito'})
 
-
 def get_profile():
-    user_id = session.get('user_id')
-    if not user_id:
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'Usuario no encontrado'}), 404
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'area': user.area,
-        'photo_url': user.photo_url
-    }), 200
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
+    try:
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+            
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'area': user.area,
+            'photo_url': user.photo_url
+        }), 200
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401
 
 
 def update_profile(data):
-    user_id = session.get('user_id')
-    if not user_id:
+    token = request.headers.get('Authorization')
+    if not token:
         return jsonify({'error': 'Usuario no autenticado'}), 401
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'Usuario no encontrado'}), 404
-    # Update allowed fields
-    if 'first_name' in data:
-        user.first_name = data.get('first_name')
-    if 'last_name' in data:
-        user.last_name = data.get('last_name')
-    if 'area' in data:
-        user.area = data.get('area')
-    if 'photo_url' in data:
-        user.photo_url = data.get('photo_url')
+    
+    if token.startswith('Bearer '):
+        token = token[7:]
+    
     try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-    return jsonify({'message': 'Perfil actualizado'}), 200
+        decoded = jwt.decode(token, 'rdeart_super_secret_key_2025', algorithms=['HS256'])
+        user_id = decoded['user_id']
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+            
+        # Update allowed fields
+        if 'first_name' in data:
+            user.first_name = data.get('first_name')
+        if 'last_name' in data:
+            user.last_name = data.get('last_name')
+        if 'area' in data:
+            user.area = data.get('area')
+        if 'photo_url' in data:
+            user.photo_url = data.get('photo_url')
+        try:
+            db.session.commit()
+            return jsonify({'message': 'Perfil actualizado'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Token inválido'}), 401

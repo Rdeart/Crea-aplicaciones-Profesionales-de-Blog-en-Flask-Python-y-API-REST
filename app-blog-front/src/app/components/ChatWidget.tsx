@@ -1,11 +1,20 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import Swal from 'sweetalert2';
+import { createChat } from '@n8n/chat';
+import { useAuth } from '../../context/AuthProvider';
 
 type Message = { role: "user" | "model"; text: string };
 type ChatType = "comercial" | "training";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL as string) || "http://localhost:5000";
+
+// Configuración de n8n
+const N8N_BASE_URL = process.env.NEXT_PUBLIC_N8N_URL || "http://localhost:5678";
+const N8N_WEBHOOKS = {
+  comercial: process.env.NEXT_PUBLIC_N8N_COMMERCIAL_WEBHOOK || "/webhook/chatbot-comercial",
+  training: process.env.NEXT_PUBLIC_N8N_TRAINING_WEBHOOK || "/webhook/chatbot-capacitacion"
+};
 
 // Función para convertir **texto** a <strong>texto</strong> y preservar saltos de línea
 const formatBoldText = (text: string) => {
@@ -25,71 +34,36 @@ export default function ChatWidget() {
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [useN8n, setUseN8n] = useState(false); // Deshabilitado temporalmente
   const imgRef = useRef<HTMLImageElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
+  const { isAuthenticated, userId } = useAuth();
 
   // Obtener ID del usuario actual desde el backend
   useEffect(() => {
-    const fetchCurrentUserId = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/user/current`, {
-          method: 'GET',
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          const userId = userData.id;
-          console.log('ID de usuario obtenido del backend:', userId, userData);
-          setCurrentUserId(userId);
-          
-          // Guardar en sessionStorage como respaldo
-          sessionStorage.setItem('current_user_id', userId);
-        } else {
-          // Fallback si falla la autenticación
-          let userId = sessionStorage.getItem('current_user_id');
-          if (!userId) {
-            userId = 'fallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            sessionStorage.setItem('current_user_id', userId);
-          }
-          console.log('ID de usuario fallback:', userId);
-          setCurrentUserId(userId);
-        }
-      } catch (error) {
-        console.warn('Error obteniendo ID del usuario:', error);
-        
-        // Fallback si hay error de red
-        let userId = sessionStorage.getItem('current_user_id');
-        if (!userId) {
-          userId = 'fallback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-          sessionStorage.setItem('current_user_id', userId);
-        }
-        console.log('ID de usuario error fallback:', userId);
-        setCurrentUserId(userId);
-      }
-    };
+    if (isAuthenticated && userId) {
+      setCurrentUserId(userId.toString());
+    } else {
+      setCurrentUserId(null);
+    }
+  }, [isAuthenticated, userId]);
 
-    fetchCurrentUserId();
-  }, []);
+  const n8nChatRef = useRef<any>(null); // Referencia al widget de n8n
 
   // Cargar mensajes guardados al montar (separados por usuario y tipo de chat)
   useEffect(() => {
     if (!currentUserId) return;
     
     const storageKey = `chatMessages_${currentUserId}_${chatType}`;
-    console.log('Cargando mensajes para:', storageKey);
     
-    const savedMessages = localStorage.getItem(storageKey);
-    if (savedMessages) {
-      try {
+    try {
+      const savedMessages = localStorage.getItem(storageKey);
+      if (savedMessages) {
         const parsed = JSON.parse(savedMessages);
-        console.log('Mensajes cargados:', parsed.length, 'mensajes');
         setMessages(parsed);
-      } catch (e) {
-        console.warn('Error loading saved messages:', e);
       }
-    } else {
-      console.log('No hay mensajes guardados para:', storageKey);
+    } catch (error) {
+      console.warn('Error loading saved messages:', error);
     }
   }, [chatType, currentUserId]);
 
@@ -98,82 +72,145 @@ export default function ChatWidget() {
     if (!currentUserId || messages.length === 0) return;
     
     const storageKey = `chatMessages_${currentUserId}_${chatType}`;
-    console.log('Guardando mensajes en:', storageKey, 'Total:', messages.length);
-    localStorage.setItem(storageKey, JSON.stringify(messages));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch (error) {
+      console.warn('Error saving messages to localStorage:', error);
+    }
   }, [messages, chatType, currentUserId]);
 
+  // Inicializar widget de n8n cuando se abre el chat
+  useEffect(() => {
+    if (open && useN8n) {
+      // Destruir widget existente si hay uno
+      if (n8nChatRef.current) {
+        // El widget n8n no tiene método destroy, solo lo limpiamos
+        n8nChatRef.current = null;
+      }
+
+      // Crear nuevo widget de n8n con el webhook adecuado
+      const webhookUrl = `${N8N_BASE_URL}${N8N_WEBHOOKS[chatType]}`;
+      
+      try {
+        n8nChatRef.current = createChat({
+          webhookUrl: webhookUrl
+          // La configuración de estilo se manejará mediante CSS personalizado
+        });
+      } catch (error) {
+        console.error('Error creando widget n8n:', error);
+        setUseN8n(false);
+      }
+    }
+
+    // Limpiar widget cuando se cierra
+    return () => {
+      if (!open && n8nChatRef.current) {
+        // El widget n8n no tiene método destroy, solo lo limpiamos
+        n8nChatRef.current = null;
+      }
+    };
+  }, [open, chatType, useN8n, currentUserId]);
   // Limpiar conversación
   const clearChat = () => {
-    Swal.fire({
-      title: '¿Estás seguro?',
-      text: "¡No podrás revertir esto!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, eliminarlo!',
-      target: '.chat-window',
-      customClass: {
-        container: 'chat-modal-container',
-        popup: 'chat-modal-popup'
+    if (useN8n) {
+      // Para n8n, simplemente recargar el widget
+      if (n8nChatRef.current) {
+        // El widget n8n no tiene método destroy, solo lo limpiamos
+        n8nChatRef.current = null;
       }
-    }).then((result) => {
-      if (result.isConfirmed) {
-        setMessages([]);
-        
-        // Limpiar solo la conversación del usuario actual y tipo de chat
-        if (currentUserId) {
-          const storageKey = `chatMessages_${currentUserId}_${chatType}`;
-          console.log('Eliminando conversación en:', storageKey);
-          localStorage.removeItem(storageKey);
+      
+      // Recrear widget limpio
+      setTimeout(() => {
+        const webhookUrl = `${N8N_BASE_URL}${N8N_WEBHOOKS[chatType]}`;
+        try {
+          n8nChatRef.current = createChat({
+            webhookUrl: webhookUrl
+            // El estilo se aplicará mediante CSS
+          });
+        } catch (error) {
+          console.error('Error recreando widget n8n:', error);
         }
-        
-        // Mensaje de confirmación
-        setMessages([{ role: 'model', text: 'Conversación eliminada. ¡Podemos empezar de nuevo!' }]);
-        
-        Swal.fire({
-          title: "Eliminado",
-          text: 'La conversación ha sido eliminada.',
-          icon: "success",
-          target: '.chat-window',
-          customClass: {
-            container: 'chat-modal-container',
-            popup: 'chat-modal-popup'
+      }, 100);
+      
+      Swal.fire('Conversación eliminada', 'El chat ha sido reiniciado.', 'success');
+    } else {
+      // Lógica original para el modo sin n8n
+      Swal.fire({
+        title: '¿Estás seguro?',
+        text: "¡No podrás revertir esto!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#0081a1',
+        confirmButtonText: 'Sí, eliminarlo!',
+        target: '.chat-window',
+        customClass: {
+          container: 'chat-modal-container',
+          popup: 'chat-modal-popup'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          setMessages([]);
+          
+          // Limpiar solo la conversación del usuario actual y tipo de chat
+          if (currentUserId) {
+            const storageKey = `chatMessages_${currentUserId}_${chatType}`;
+            localStorage.removeItem(storageKey);
           }
-        });
-      }
-    });
+          
+          // Mensaje de confirmación
+          setMessages([{ role: 'model', text: 'Conversación eliminada. ¡Podemos empezar de nuevo!' }]);
+          
+          Swal.fire({
+            title: "Eliminado",
+            text: 'La conversación ha sido eliminada.',
+            icon: "success",
+            target: '.chat-window',
+            customClass: {
+              container: 'chat-modal-container',
+              popup: 'chat-modal-popup'
+            }
+          });
+        }
+      });
+    }
   };
 
   // Seleccionar chatbot
   const selectChatbot = (type: ChatType) => {
-    console.log('Seleccionando chatbot:', type);
     setChatType(type);
     setShowMenu(false);
     
-    // Limpiar mensajes actuales y cargar los del nuevo chatbot para este usuario
+    // Si usamos n8n, simplemente cambiar el tipo y abrir
+    if (useN8n) {
+      // Destruir widget actual
+      if (n8nChatRef.current) {
+        // El widget n8n no tiene método destroy, solo lo limpiamos
+        n8nChatRef.current = null;
+      }
+      setOpen(true);
+      return;
+    }
+    
+    // Lógica original para modo sin n8n
     setMessages([]);
     
     // Cargar mensajes guardados del nuevo chatbot para este usuario
     if (currentUserId) {
       const storageKey = `chatMessages_${currentUserId}_${type}`;
-      console.log('Buscando mensajes en:', storageKey);
-      const savedMessages = localStorage.getItem(storageKey);
-      if (savedMessages) {
-        try {
+      try {
+        const savedMessages = localStorage.getItem(storageKey);
+        if (savedMessages) {
           const parsed = JSON.parse(savedMessages);
-          console.log('Mensajes encontrados:', parsed.length);
           setMessages(parsed);
-        } catch (e) {
-          console.warn('Error loading saved messages:', e);
+        } else {
+          // Forzar un mensaje inicial limpio
+          setTimeout(() => {
+            setMessages([{ role: 'model', text: 'Cargando...' }]);
+          }, 100);
         }
-      } else {
-        console.log('No hay mensajes guardados, iniciando chatbot nuevo');
-        // Forzar un mensaje inicial limpio
-        setTimeout(() => {
-          // Esto forzará el useEffect a cargar el saludo inicial correcto
-          setMessages([{ role: 'model', text: 'Cargando...' }]);
-        }, 100);
+      } catch (error) {
+        console.warn('Error loading saved messages:', error);
       }
     }
     
@@ -188,7 +225,7 @@ export default function ChatWidget() {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
+      cancelButtonColor: '#0081a1',
       confirmButtonText: 'Sí, eliminarlo!',
       target: '.chat-window',
       customClass: {
@@ -290,30 +327,36 @@ export default function ChatWidget() {
 
   async function send() {
     if (!input.trim()) return;
+    
+    // Verificar que el usuario esté autenticado
+    if (!currentUserId) {
+      setMessages((p) => [...p, { role: 'model', text: 'Debes iniciar sesión para usar el chatbot.' }]);
+      return;
+    }
+    
     const userMsg: Message = { role: "user", text: input.trim() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
     setLoading(true);
     
-    // Debug: mostrar qué chat_type se está enviando
-    console.log('Enviando mensaje con chat_type:', chatType);
-    
     try {
       const payload = { 
         messages: newMessages,
-        chat_type: chatType
+        user_id: currentUserId
       };
-      const res = await fetch(`${API_BASE}/api/chat`, {
+      
+      const chatEndpoint = chatType === 'training' 
+        ? `${API_BASE}/api/chat/capacitacion`
+        : `${API_BASE}/api/chat/comercial`;
+      
+      const res = await fetch(chatEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => null);
-      
-      // Debug: mostrar respuesta del servidor
-      console.log('Respuesta del servidor:', data);
       
       if (!res.ok) {
         if (res.status === 401) {
@@ -355,6 +398,29 @@ export default function ChatWidget() {
           max-height: calc(100% - 40px) !important;
           transform: none !important;
         }
+        
+        /* Estilos personalizados para widget n8n */
+        #n8n-chat-container :global(.n8n-chat) {
+          --primary-color: ${chatType === 'training' ? '#10b981' : '#0081a1'};
+          --background-color: #ffffff;
+          --text-color: #333333;
+          --border-radius: 8px;
+        }
+        
+        #n8n-chat-container :global(.n8n-chat-window) {
+          height: 384px !important; /* h-96 */
+          border-radius: 8px !important;
+        }
+        
+        #n8n-chat-container :global(.n8n-chat-header) {
+          background: ${chatType === 'training' ? '#10b981' : '#0081a1'} !important;
+          color: white !important;
+          border-radius: 8px 8px 0 0 !important;
+        }
+        
+        #n8n-chat-container :global(.n8n-chat-send-button) {
+          background: ${chatType === 'training' ? '#10b981' : '#0081a1'} !important;
+        }
       `}</style>
       <div className="flex flex-col items-end">
           {open && (
@@ -387,23 +453,46 @@ export default function ChatWidget() {
                 </button>
               </div>
             </div>
-            <div ref={scroller} className="p-2 h-56 overflow-auto bg-gray-50">
-              {messages.map((m, i) => (
-                <div key={i} className={m.role === "user" ? "text-right my-1" : "text-left my-1"}>
-                  <div className={m.role === "user" ? "inline-block bg-blue-600 text-white px-3 py-1 rounded" : "inline-block bg-white px-3 py-1 rounded shadow-sm"}>
-                    {m.role === "model" ? (
-                      <span dangerouslySetInnerHTML={{ __html: formatBoldText(m.text) }} />
-                    ) : (
-                      m.text
-                    )}
-                  </div>
+            
+            {/* Contenedor del chat - mostrar widget n8n o chat original */}
+            {useN8n ? (
+              <div className="relative h-96" id="n8n-chat-container">
+                {/* El widget de n8n se renderizará aquí */}
+              </div>
+            ) : (
+              <>
+                <div ref={scroller} className="p-2 h-56 overflow-auto bg-gray-50">
+                  {messages.map((m, i) => (
+                    <div key={i} className={m.role === "user" ? "text-right my-1" : "text-left my-1"}>
+                      <div className={m.role === "user" ? "inline-block bg-blue-600 text-white px-3 py-1 rounded" : "inline-block bg-white px-3 py-1 rounded shadow-sm"}>
+                        {m.role === "model" ? (
+                          <span dangerouslySetInnerHTML={{ __html: formatBoldText(m.text) }} />
+                        ) : (
+                          m.text
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="p-2 border-t flex gap-2">
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} className="flex-1 px-2 py-1 border rounded" placeholder="Escribe tu consulta..." />
-              <button onClick={send} className="bg-blue-600 text-white px-3 py-1 rounded">Enviar</button>
-            </div>
+                <div className="p-2 border-t flex gap-2">
+                  <input 
+                    value={input} 
+                    onChange={(e) => setInput(e.target.value)} 
+                    onKeyDown={(e) => e.key === "Enter" && send()} 
+                    className="flex-1 px-2 py-1 border rounded" 
+                    placeholder={currentUserId ? "Escribe tu consulta..." : "Inicia sesión para usar el chatbot"}
+                    disabled={!currentUserId}
+                  />
+                  <button 
+                    onClick={send} 
+                    className={`px-3 py-1 rounded ${currentUserId ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                    disabled={!currentUserId}
+                  >
+                    Enviar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -418,21 +507,6 @@ export default function ChatWidget() {
               <h3 className="text-lg font-semibold text-gray-800 mb-3 text-center">Selecciona un asistente</h3>
               <div className="space-y-2">
                 <button
-                  onClick={() => selectChatbot('comercial')}
-                  className="w-full text-left p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                      K
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-800">KAT-IA Asistente</div>
-                      <div className="text-sm text-gray-600">Asistente Comercial</div>
-                    </div>
-                  </div>
-                </button>
-                
-                <button
                   onClick={() => selectChatbot('training')}
                   className="w-full text-left p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors border border-green-200"
                 >
@@ -443,6 +517,21 @@ export default function ChatWidget() {
                     <div>
                       <div className="font-medium text-gray-800">Asistente de Capacitación</div>
                       <div className="text-sm text-gray-600">Instructor Digital Experto</div>
+                    </div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => selectChatbot('comercial')}
+                  className="w-full text-left p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                      K
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-800">KAT-IA Asistente</div>
+                      <div className="text-sm text-gray-600">Asistente Comercial</div>
                     </div>
                   </div>
                 </button>
@@ -462,6 +551,7 @@ export default function ChatWidget() {
                 ref={imgRef}
                 src={`${API_BASE}/static/img/chatbot-avatar-transparent.png`}
                 alt="avatar"
+                loading="lazy"
                 style={{
                   height: 112,
                   width: 'auto',

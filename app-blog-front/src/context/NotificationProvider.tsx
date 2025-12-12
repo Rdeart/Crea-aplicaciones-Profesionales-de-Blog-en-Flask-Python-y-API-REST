@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useAuth } from './AuthProvider';
 
 type NotificationItem = {
   id: number;
@@ -35,10 +36,21 @@ export const useNotifications = () => {
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const { isAuthenticated } = useAuth();
 
   const fetchNotifications = async () => {
+    if (!isAuthenticated) return;
     try {
-      const res = await fetch('http://localhost:5000/notifications', { credentials: 'include' });
+      const token = localStorage.getItem('auth_token')
+      const headers: Record<string, string> = {'Content-Type': 'application/json'}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const res = await fetch('http://localhost:5000/notifications', { 
+        headers,
+        credentials: 'include' 
+      });
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data);
@@ -51,8 +63,18 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const fetchUnreadCount = async () => {
+    if (!isAuthenticated) return;
     try {
-      const res = await fetch('http://localhost:5000/notifications/unread_count', { credentials: 'include' });
+      const token = localStorage.getItem('auth_token')
+      const headers: Record<string, string> = {'Content-Type': 'application/json'}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const res = await fetch('http://localhost:5000/notifications/unread_count', { 
+        headers,
+        credentials: 'include' 
+      });
       if (!res.ok) return;
       const data = await res.json();
       setUnreadCount(data.unread || 0);
@@ -62,12 +84,14 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     // initial load of full notifications
     fetchNotifications();
     // lightweight polling for unread count
     const id = setInterval(fetchUnreadCount, 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [isAuthenticated]);
 
   const markAsRead = async (id: number) => {
     try {

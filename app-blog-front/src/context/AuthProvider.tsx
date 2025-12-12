@@ -16,16 +16,37 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     useEffect(() => {
         const checkAuthStatus = async () => {
+            console.log('AuthProvider: Iniciando verificación de autenticación');
+            const token = localStorage.getItem('auth_token');
+            console.log('AuthProvider: Token encontrado:', !!token);
+            
+            if (!token) {
+                console.log('AuthProvider: No hay token, usuario no autenticado');
+                setIsAuthenticated(false);
+                setLoading(false);
+                return;
+            }
+            
             try {
-                const response = await fetch('http://localhost:5000/check-auth', {credentials: 'include'})
-                const data = await response.json()
+                console.log('AuthProvider: Verificando token con /check-auth');
+                const response = await fetch('http://localhost:5000/check-auth', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                
+                console.log('AuthProvider: Response status:', response.status);
+                const data = await response.json();
+                console.log('AuthProvider: Response data:', data);
+                
                 if (data.authenticated){
-                    setIsAuthenticated(data.authenticated)                 
-                    setUsername(data.username)
-                    setUserId(data.user_id)
+                    console.log('AuthProvider: Usuario autenticado, actualizando estado');
+                    setIsAuthenticated(data.authenticated);                 
+                    setUsername(data.username);
+                    setUserId(data.user_id);
                     // Si está autenticado, traemos también el perfil (si existe)
                     try {
-                        const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
+                        const prof = await fetch('http://localhost:5000/user/profile', {
+                            headers: {'Authorization': `Bearer ${token}`}
+                        })
                         if (prof.ok) {
                             const pd = await prof.json().catch(() => null)
                             if (pd) setProfile(pd)
@@ -34,20 +55,23 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
                         console.warn('No se pudo obtener el perfil del usuario', e)
                     }
                 } else {
-                    setIsAuthenticated(false)
-                    setUsername('')
-                    setUserId(null)
+                    console.log('AuthProvider: Token inválido, limpiando estado');
+                    setIsAuthenticated(false);
+                    setUsername('');
+                    setUserId(null);
+                    localStorage.removeItem('auth_token');
                 }
-
             } catch (error) {
-                console.error('Error al verificar la autenticacion', error)
-                setIsAuthenticated(false)
-                setUsername('')
-                
+                console.error('AuthProvider: Error checking auth:', error);
+                setIsAuthenticated(false);
+                setUsername('');
+                setUserId(null);
+                localStorage.removeItem('auth_token');
             } finally {
-                setLoading(false)
+                setLoading(false);
+                console.log('AuthProvider: Verificación completada');
             }
-        } 
+        };    
 
         checkAuthStatus();
 
@@ -81,58 +105,54 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     const login = async (email: string, password: string): Promise<{success: boolean, message: string}> => {
         try {
+            console.log('Intentando login con:', email)
             const response = await fetch('http://localhost:5000/login', {
                 method: 'POST',
-                credentials: 'include',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({email, password})
             })
+            console.log('Respuesta login status:', response.status)
             if (response.ok) {
-                // successful login: fetch session info
-                try {
-                    const check = await fetch('http://localhost:5000/check-auth', {credentials: 'include'})
-                    const data = await check.json()
-                    if (data.authenticated){
-                        setIsAuthenticated(true)
-                        setUsername(data.username)
-                        setUserId(data.user_id)
-                        // cargar perfil tras inicio de sesión
-                        try {
-                            const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
-                            if (prof.ok) {
-                                const pd = await prof.json().catch(() => null)
-                                if (pd) setProfile(pd)
-                            }
-                        } catch (e) {
-                            console.warn('No se pudo obtener el perfil después del login', e)
-                        }
-                        return {success: true, message: 'Inicio de sesion exitoso'}
-                    }
-                } catch (e) {
-                    // fallback: mark authenticated
+                const data = await response.json()
+                console.log('Datos login:', data)
+                if (data.token) {
+                    localStorage.setItem('auth_token', data.token)
                     setIsAuthenticated(true)
+                    setUsername(data.username)
+                    setUserId(data.user_id)
+                    console.log('Login exitoso, token guardado')
+                    // cargar perfil tras inicio de sesión
+                    try {
+                        const prof = await fetch('http://localhost:5000/user/profile', {
+                            headers: {'Authorization': `Bearer ${data.token}`}
+                        })
+                        if (prof.ok) {
+                            const pd = await prof.json().catch(() => null)
+                            if (pd) setProfile(pd)
+                        }
+                    } catch (e) {
+                        console.warn('No se pudo obtener el perfil después del login', e)
+                    }
                     return {success: true, message: 'Inicio de sesion exitoso'}
                 }
             }
             const err = await response.json().catch(() => null)
+            console.log('Error login:', err)
             return {success: false, message: err?.error || 'Credenciales invalidas'}
         } catch (error) {
-            console.error('Error al iniciar sesion:', error)
+            console.error('Error al iniciar sesión:', error)
             return {success: false, message: 'Error de conexión'}
         }
     }
 
     const logout = async (): Promise<{success: boolean}> => {
         try {
-            const response = await fetch('http://localhost:5000/logout', {
-                method: 'POST',
-                credentials: 'include'
-            })
+            localStorage.removeItem('auth_token')
             setIsAuthenticated(false)
             setUsername('')
             setUserId(null)
             setProfile(undefined)
-            return {success: response.ok}
+            return {success: true}
         } catch (error) {
             console.error('Error al cerrar sesion:', error)
             return {success: false}
@@ -141,8 +161,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     // Función para recargar el perfil desde el backend manualmente
     const refreshProfile = async () => {
+        const token = localStorage.getItem('auth_token')
+        if (!token) return
+        
         try {
-            const prof = await fetch('http://localhost:5000/user/profile', {credentials: 'include'})
+            const prof = await fetch('http://localhost:5000/user/profile', {
+                headers: {'Authorization': `Bearer ${token}`}
+            })
             if (prof.ok) {
                 const pd = await prof.json().catch(() => null)
                 setProfile(pd)

@@ -21,20 +21,80 @@ const NotificationBell: React.FC = () => {
   };
 
   const onClickNotification = async (n: any) => {
+    console.log('DEBUG - Click en notificación:', n);
+    
     try {
-      await markAsRead(n.id);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return;
+      }
+      
+      const url = `http://localhost:5000/notifications/${n.id}/click`;
+      console.log('DEBUG - URL a llamar:', url);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('DEBUG - Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Notificación eliminada automáticamente:', data.message);
+        
+        // Redirigir según la información devuelta por el backend
+        if (data.redirect) {
+          if (data.redirect.type === 'article') {
+            router.push(`/articles/${data.redirect.id}`);
+          } else if (data.redirect.type === 'comment') {
+            router.push(`/articles/${data.redirect.id}#comment-${n.comment_id}`);
+          }
+        } else {
+          // Redirección por defecto si no hay información de redirección
+          if (n.type === 'reaction_comment') {
+            if (n.article_id && n.comment_id) {
+              router.push(`/articles/${n.article_id}#comment-${n.comment_id}`);
+            } else if (n.article_id) {
+              router.push(`/articles/${n.article_id}`);
+            }
+          } else if (n.article_id) {
+            router.push(`/articles/${n.article_id}`);
+          }
+        }
+      } else {
+        console.error('Error al eliminar notificación:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        // Fallback: marcar como leída y redirigir
+        await markAsRead(n.id);
+        if (n.type === 'reaction_comment') {
+          if (n.article_id && n.comment_id) {
+            router.push(`/articles/${n.article_id}#comment-${n.comment_id}`);
+          } else if (n.article_id) {
+            router.push(`/articles/${n.article_id}`);
+          }
+        } else if (n.article_id) {
+          router.push(`/articles/${n.article_id}`);
+        }
+      }
     } catch (e) {
-      console.error('mark as read failed', e);
-    }
-
-    if (n.type === 'reaction_comment') {
-      if (n.article_id && n.comment_id) {
-        router.push(`/articles/${n.article_id}#comment-${n.comment_id}`);
+      console.error('Error al procesar notificación:', e);
+      // Fallback: marcar como leída y redirigir
+      await markAsRead(n.id);
+      if (n.type === 'reaction_comment') {
+        if (n.article_id && n.comment_id) {
+          router.push(`/articles/${n.article_id}#comment-${n.comment_id}`);
+        } else if (n.article_id) {
+          router.push(`/articles/${n.article_id}`);
+        }
       } else if (n.article_id) {
         router.push(`/articles/${n.article_id}`);
       }
-    } else if (n.article_id) {
-      router.push(`/articles/${n.article_id}`);
     }
 
     setOpen(false);

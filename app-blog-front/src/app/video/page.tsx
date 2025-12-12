@@ -1,72 +1,38 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-export default function VideoPlayerPage() {
-    const searchParams = useSearchParams()
-    const urlParam = searchParams.get('url')
-    const [src, setSrc] = useState<string | null>(null)
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [triedProxy, setTriedProxy] = useState(false)
-
-    useEffect(() => {
-        setError(null)
-        setSrc(null)
-        if (!urlParam) return
-        try {
-            const decoded = decodeURIComponent(urlParam)
-            setSrc(decoded)
-        } catch (e) {
-            setSrc(urlParam)
-        }
-    }, [urlParam])
-
-    const makeProxy = (u?: string | null) => {
-        if (!u) return undefined
-        return `/proxy?url=${encodeURIComponent(u)}`
-    }
-
-    if (!urlParam) return <div className="p-6">URL de video no proporcionada.</div>
-
-    return (
-        <div className="min-h-screen bg-white p-6">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold mb-4">Reproductor de video</h1>
-                <div className="mb-4 text-sm text-gray-600">Si el video no se reproduce aquí, usa el enlace "Abrir en nueva pestaña".</div>
-                <div>
-                    {src ? (
-                        <div>
-                            <video
-                                controls
-                                className="w-full max-h-[720px] rounded shadow-md"
-                                crossOrigin="anonymous"
-                                onError={() => {
-                                    if (!triedProxy) {
-                                        const proxy = makeProxy(src)
-                                        if (proxy) {
-                                            setTriedProxy(true)
-                                            setError(null)
-                                            setSrc(proxy)
-                                            return
-                                        }
-                                    }
-                                    setError('No se pudo reproducir el video. Comprueba que la URL sea pública y que el formato sea compatible (MP4/WebM/HLS).')
-                                }}
-                            >
-                                <source src={src} />
-                                Tu navegador no soporta la reproducción de video.
-                            </video>
-                            <div className="mt-3 flex items-center justify-between">
-                                <a href={src || '#'} target="_blank" rel="noreferrer" className="text-[#0081a1] hover:underline">Abrir en nueva pestaña</a>
-                                {error && <span className="text-sm text-red-600">{error}</span>}
-                            </div>
-                        </div>
-                    ) : (
-                        <div>Cargando video...</div>
-                    )}
-                </div>
-            </div>
+function VideoPlayerContent() {
+  const searchParams = useSearchParams()
+  const videoId = searchParams.get('v')
+  
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Reproductor de Vídeo</h1>
+      {videoId ? (
+        <div className="aspect-w-16 aspect-h-9">
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}`}
+            title="YouTube video player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full h-96 rounded-lg"
+          />
         </div>
-    )
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-gray-600">No se proporcionó un ID de vídeo</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function VideoPlayerPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto p-4">Cargando...</div>}>
+      <VideoPlayerContent />
+    </Suspense>
+  )
 }

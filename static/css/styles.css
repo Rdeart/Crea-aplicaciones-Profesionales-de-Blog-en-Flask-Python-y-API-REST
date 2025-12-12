@@ -1,27 +1,242 @@
-/* Styles for chatbot UI */
-body { font-family: system-ui, Arial, sans-serif; background: #fff; color: #111; }
-.page { max-width: 960px; margin: 24px auto; padding: 12px; }
-.site-header { margin-bottom: 16px; }
-#chat-container { position: relative; width: 100%; max-width: 720px; margin: 0 auto; }
-#chat-window { height: 420px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: auto; padding: 12px; background: #fafafa }
-#messages { display: flex; flex-direction: column; gap: 10px; }
-.message { max-width: 78%; padding: 10px 14px; border-radius: 14px; display: inline-block; }
-.message.user { background: #5b21b6; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
-.message.bot { background: #fff; color: #111; box-shadow: 0 1px 3px rgba(0,0,0,0.06); align-self: flex-start; }
-#chat-controls { display:flex; gap:8px; margin-top: 10px; }
-#chat-input { flex:1; padding:10px; border-radius:8px; border:1px solid #e5e7eb }
-#chat-send { padding:10px 16px; background:#5b21b6; color:#fff; border-radius:8px; border:none }
+/* Estilos para la interfaz del chatbot */
+body { 
+  font-family: system-ui, Arial, sans-serif; 
+  background: #fff; 
+  color: #111; 
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
 
-/* Floating open button */
+/* Scroll para el modal - ASEGURAR QUE FUNCIONE */
+.fixed.inset-0.z-40 {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Estilos responsivos para el modal de Crear Artículo - SIN !important */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 100%;
+  max-height: 95vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.modal-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.modal-footer {
+  border-top: 1px solid #e5e7eb;
+  padding: 1rem;
+  background: white;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* Formularios responsivos */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  color: #374151;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.form-textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.form-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.btn {
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: #9ca3af;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background: #6b7280;
+}
+
+.btn-submit {
+  background: #0081a1;
+  color: white;
+}
+
+.btn-submit:hover {
+  background: #00738a;
+}
+
+.page { 
+  width: 100%;
+  max-width: 100%;
+  margin: 0; 
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.site-header { 
+  margin-bottom: 20px; 
+  text-align: center;
+}
+
+.site-header h1 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  margin: 0;
+  padding: 0 10px;
+}
+
+#chat-container { 
+  position: relative; 
+  width: 100%; 
+  max-width: 100%; 
+  margin: 0 auto; 
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 10px;
+}
+#chat-window { 
+  height: min(60vh, 500px); 
+  border: 1px solid #e5e7eb; 
+  border-radius: 12px; 
+  overflow: auto; 
+  padding: 12px; 
+  background: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+#messages { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 10px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.message { 
+  max-width: 85%; 
+  padding: 10px 14px; 
+  border-radius: 14px; 
+  display: inline-block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
+}
+
+.message.user { 
+  background: #5b21b6; 
+  color: #fff; 
+  align-self: flex-end; 
+  border-bottom-right-radius: 4px; 
+}
+
+.message.bot { 
+  background: #fff; 
+  color: #111; 
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06); 
+  align-self: flex-start; 
+}
+
+#chat-controls { 
+  display:flex; 
+  gap:8px; 
+  margin-top: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+#chat-input { 
+  flex:1; 
+  padding:12px; 
+  border-radius:8px; 
+  border:1px solid #e5e7eb;
+  min-width: 0;
+  font-size: 16px;
+}
+
+#chat-send { 
+  padding:12px 20px; 
+  background:#5b21b6; 
+  color:#fff; 
+  border-radius:8px; 
+  border:none;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+/* Botón flotante de apertura */
 #chatbot-open-button { position: fixed; right: 24px; bottom: 24px; width:64px; height:64px; border-radius:50%; border:none; background:#fff; box-shadow: 0 6px 18px rgba(0,0,0,0.12); display:flex; align-items:center; justify-content:center; }
 #chatbot-avatar { width:44px; height:44px; border-radius:6px; }
 
-/* Avatar-only style: show only the image without circular background or shadow. Increased size for the muñequita */
+/* Estilo solo avatar: mostrar solo la imagen sin fondo circular o sombra. Tamaño aumentado para la muñeca */
 .avatar-only { background: transparent !important; box-shadow: none !important; width: auto !important; height: auto !important; padding: 0 !important; }
 .avatar-only img#chatbot-avatar { height: 112px; width: auto; max-width: 112px; border-radius: 0 !important; display: block; object-fit: contain; }
 .avatar-only button, .avatar-only[role="button"] { background: transparent; box-shadow:none; }
 
-/* Ensure the open button with id loses its white background when avatar-only is present */
+/* Asegurar que el botón de apertura con id pierda su fondo blanco cuando está presente avatar-only */
 #chatbot-open-button.avatar-only, button#chatbot-open-button.avatar-only {
 	background: transparent !important;
 	box-shadow: none !important;
@@ -31,7 +246,7 @@ body { font-family: system-ui, Arial, sans-serif; background: #fff; color: #111;
 	height: auto !important;
 }
 
-/* Ensure any button with avatar-only style shows only the image */
+/* Asegurar que cualquier botón con estilo avatar-only muestre solo la imagen */
 button.avatar-only {
 	background: transparent !important;
 	box-shadow: none !important;
@@ -41,33 +256,279 @@ button.avatar-only {
 	height: auto !important;
 }
 
-/* Ensure no background appears on hover/active/focus for avatar-only buttons */
+/* Asegurar que no aparezca fondo en hover/active/focus para botones avatar-only */
 button.avatar-only:hover, button.avatar-only:active, #chatbot-open-button.avatar-only:hover, #chatbot-open-button.avatar-only:active, #chatbot-open-button.avatar-only:focus {
 	background: transparent !important;
 	box-shadow: none !important;
 }
 
-/* Ensure the image itself has transparent background */
+/* Asegurar que la imagen misma tenga fondo transparente */
 .avatar-only img, button.avatar-only img, #chatbot-open-button.avatar-only img {
 	background: transparent !important;
 }
 
-/* Hover / motion: subtle lift and scale when user hovers or focuses the avatar */
+/* Hover / movimiento: elevación sutil y escala cuando el usuario pasa el cursor o enfoca el avatar */
 .avatar-only img, button.avatar-only img, #chatbot-open-button.avatar-only img { transition: transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms !important; will-change: transform; cursor: pointer; transform-origin: center center !important; -webkit-transform: translateZ(0); transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-/* Stronger hover rules with !important to override external style frameworks */
+/* Reglas de hover más fuertes con !important para anular frameworks de estilo externos */
 .avatar-only:hover > img, button.avatar-only:hover img, #chatbot-open-button.avatar-only:hover > img { transform: translateY(-12px) scale(1.18) !important; }
 .avatar-only:focus > img, button.avatar-only:focus img, #chatbot-open-button.avatar-only:focus > img { transform: translateY(-12px) scale(1.18) !important; }
 .avatar-only:active > img, button.avatar-only:active img, #chatbot-open-button.avatar-only:active > img { transform: translateY(-3px) scale(0.98) !important; }
 .avatar-only:focus-visible img { outline: 3px solid rgba(59,130,246,0.18); border-radius: 4px; }
 
-/* Chat header and close button */
+/* Cabecera del chat y botón de cerrar */
 .chat-header { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #eee; background:#f8fafc; }
 .chat-header strong { font-size:14px; }
 .chat-close { background:transparent; border:0; font-size:20px; line-height:1; cursor:pointer; padding:4px 8px; color:#444; }
 .chat-close:hover { color:#000; }
 
-/* Responsive: cap avatar size on small screens */
-@media (max-width:600px){ .avatar-only img#chatbot-avatar { height: 84px; width: auto; max-width:84px; } #chat-window { height: 320px } }
+/* Media Queries para diferentes tamaños de pantalla */
 
-/* Mobile adjustments */
-@media (max-width:600px){ #chat-window { height: 320px } }
+/* Móviles (hasta 768px) */
+@media (max-width: 768px) {
+  .page {
+    padding: 10px;
+  }
+  
+  .site-header h1 {
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+  }
+  
+  #chat-window {
+    height: min(50vh, 400px);
+    padding: 8px;
+  }
+  
+  .message {
+    max-width: 90%;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  #chat-input, #chat-send {
+    padding: 10px;
+    font-size: 14px;
+  }
+  
+  .avatar-only img#chatbot-avatar {
+    height: 80px;
+    max-width: 80px;
+  }
+  
+  #chatbot-open-button {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  /* Modal responsivo en móviles - SIN !important */
+  .fixed.inset-0.z-40 {
+    padding: 5px;
+    overflow-y: auto;
+  }
+  
+  .bg-white.p-4.rounded-lg.shadow-lg.max-w-3xl.w-full {
+    max-height: none;
+    min-height: 100vh;
+    margin: 0;
+    overflow: visible;
+  }
+  
+  .bg-white.p-4.rounded-lg.shadow-lg.max-w-3xl.w-full h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .flex-1.overflow-auto.px-2.pb-4 {
+    padding: 0.5rem;
+    overflow: visible;
+    flex: none;
+  }
+  
+  .flex.flex-col.h-full {
+    min-height: auto;
+    height: auto;
+  }
+  
+  .mb-4 {
+    margin-bottom: 0.75rem;
+  }
+  
+  .w-full.p-2.border.border-gray-300.rounded,
+  .w-full.p-3.border.border-gray-300.rounded {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .h-48.md\:h-64 {
+    min-height: 6rem;
+  }
+  
+  .mt-2.border-t.pt-3.bg-white.sticky.bottom-0.z-20 {
+    padding: 0.75rem 0.5rem;
+    position: relative;
+    margin-top: 1rem;
+  }
+  
+  .bg-gray-400.hover\:bg-gray-500.text-white.px-4.rounded.mr-2,
+  .bg-\[\#0081a1\].hover\:bg-\[\#00738a\].text-white.px-4.rounded.mr-2 {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .flex.justify-end.px-2 {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .bg-gray-400.hover\:bg-gray-500.text-white.px-4.rounded.mr-2,
+  .bg-\[\#0081a1\].hover\:bg-\[\#00738a\].text-white.px-4.rounded.mr-2 {
+    flex: 1;
+    min-width: 100px;
+  }
+}
+
+/* Tablets y portátiles pequeños (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .page {
+    padding: 12px;
+    max-width: 95%;
+    margin: 0 auto;
+  }
+  
+  #chat-window {
+    height: min(55vh, 450px);
+  }
+  
+  .message {
+    max-width: 80%;
+  }
+  
+  .avatar-only img#chatbot-avatar {
+    height: 96px;
+    max-width: 96px;
+  }
+
+  /* Modal en tablets y portátiles - PERMITIR SCROLL */
+  .fixed.inset-0.z-40 {
+    padding: 10px;
+    overflow-y: auto;
+  }
+  
+  .bg-white.p-4.rounded-lg.shadow-lg.max-w-3xl.w-full {
+    max-height: none;
+    min-height: 90vh;
+    margin: 0;
+    overflow: visible;
+  }
+  
+  .flex-1.overflow-auto.px-2.pb-4 {
+    overflow: visible;
+    flex: none;
+  }
+  
+  .flex.flex-col.h-full {
+    height: auto;
+  }
+  
+  .mt-2.border-t.pt-3.bg-white.sticky.bottom-0.z-20 {
+    position: relative;
+    margin-top: 1rem;
+  }
+}
+
+/* Portátiles medianos y escritorios (1025px - 1440px) */
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .page {
+    padding: 15px;
+    max-width: 90%;
+    margin: 0 auto;
+  }
+  
+  #chat-window {
+    height: min(60vh, 500px);
+  }
+  
+  .avatar-only img#chatbot-avatar {
+    height: 104px;
+    max-width: 104px;
+  }
+
+  /* Modal en portátiles medianos - PERMITIR SCROLL */
+  .fixed.inset-0.z-40 {
+    padding: 15px;
+    overflow-y: auto;
+  }
+  
+  .bg-white.p-4.rounded-lg.shadow-lg.max-w-3xl.w-full {
+    max-height: none;
+    min-height: 85vh;
+    margin: 0;
+    overflow: visible;
+  }
+  
+  .flex-1.overflow-auto.px-2.pb-4 {
+    overflow: visible;
+    flex: none;
+  }
+  
+  .flex.flex-col.h-full {
+    height: auto;
+  }
+  
+  .mt-2.border-t.pt-3.bg-white.sticky.bottom-0.z-20 {
+    position: relative;
+    margin-top: 1rem;
+  }
+}
+
+/* Pantallas grandes (más de 1440px) */
+@media (min-width: 1441px) {
+  .page {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .avatar-only img#chatbot-avatar {
+    height: 112px;
+    max-width: 112px;
+  }
+
+  /* Modal en pantallas grandes */
+  .bg-white.p-4.rounded-lg.shadow-lg.max-w-3xl.w-full {
+    max-width: 1200px;
+  }
+}
+
+/* Asegurar que las imágenes no se desborden */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Prevenir scroll horizontal */
+body, html {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Mejoras adicionales para responsividad */
+* {
+  box-sizing: border-box;
+}
+
+/* Controles del chat responsivos */
+#chat-controls {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#chat-input {
+  min-width: 150px;
+  flex: 1;
+}
+
+/* Botón enviar responsivo */
+#chat-send {
+  flex-shrink: 0;
+}
