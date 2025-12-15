@@ -329,7 +329,28 @@ const ArticlePage: React.FC<{ params: Promise<{ id: string }> }> = ({ params }) 
 
   const toggleReaction = async (type: 'heart' | 'like' | 'laugh') => {
     if (!articleId) return;
-    if (!userId) { alert('Inicia sesión para reaccionar'); return; }
+    if (!userId) {
+      const result = await Swal.fire({
+        title: '¡Inicia sesión para reaccionar!',
+        html: 'Para poder reaccionar a los artículos, necesitas <strong>iniciar sesión</strong> en tu cuenta.',
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#0081a1',
+        backdrop: 'rgba(0, 0, 0, 0.8)',
+        customClass: {
+          popup: 'login-modal-popup',
+          title: 'login-modal-title',
+          htmlContainer: 'login-modal-content'
+        }
+      });
+      
+      // Si el usuario hace clic en "Entendido", cerrar el modal y redirigir a la página de login
+      if (result.isConfirmed) {
+        await Swal.fire({ showConfirmButton: false, timer: 50 });
+        router.push('/pages/login');
+      }
+      return;
+    }
     try {
       const token = localStorage.getItem('auth_token');
       const headers: any = { 'Content-Type': 'application/json' };
@@ -356,7 +377,28 @@ const ArticlePage: React.FC<{ params: Promise<{ id: string }> }> = ({ params }) 
 
   const toggleCommentReaction = async (commentId: number, type: 'heart' | 'like' | 'laugh') => {
     if (!articleId) return;
-    if (!userId) { alert('Inicia sesión para reaccionar a comentarios'); return; }
+    if (!userId) {
+      const result = await Swal.fire({
+        title: '¡Inicia sesión para reaccionar!',
+        html: 'Para poder reaccionar a los comentarios, necesitas <strong>iniciar sesión</strong> en tu cuenta.',
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#0081a1',
+        backdrop: 'rgba(0, 0, 0, 0.8)',
+        customClass: {
+          popup: 'login-modal-popup',
+          title: 'login-modal-title',
+          htmlContainer: 'login-modal-content'
+        }
+      });
+      
+      // Si el usuario hace clic en "Entendido", cerrar el modal y redirigir a la página de login
+      if (result.isConfirmed) {
+        await Swal.fire({ showConfirmButton: false, timer: 50 });
+        router.push('/pages/login');
+      }
+      return;
+    }
     try {
       const token = localStorage.getItem('auth_token');
       const headers: any = { 'Content-Type': 'application/json' };

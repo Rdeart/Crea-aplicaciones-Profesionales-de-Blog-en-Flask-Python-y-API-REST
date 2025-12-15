@@ -289,6 +289,13 @@ export default function ChatWidget() {
     if (!open) return;
     // Solo mostrar saludo inicial si no hay mensajes guardados
     if (messages.length === 0) {
+      // Verificar autenticación primero
+      if (!currentUserId) {
+        setMessages([{ role: 'model', text: 'Debes iniciar sesión para usar el chatbot. Por favor, inicia sesión en la página principal.' }]);
+        setLoading(false);
+        return;
+      }
+      
       (async () => {
         setLoading(true);
         try {
@@ -319,7 +326,7 @@ export default function ChatWidget() {
         }
       })();
     }
-  }, [open, messages.length]);
+  }, [open, messages.length, currentUserId]);
 
   useEffect(() => {
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
@@ -408,7 +415,7 @@ export default function ChatWidget() {
         }
         
         #n8n-chat-container :global(.n8n-chat-window) {
-          height: 384px !important; /* h-96 */
+          height: 512px !important; /* Increased from h-96 (384px) to h-128 (512px) */
           border-radius: 8px !important;
         }
         
@@ -456,12 +463,12 @@ export default function ChatWidget() {
             
             {/* Contenedor del chat - mostrar widget n8n o chat original */}
             {useN8n ? (
-              <div className="relative h-96" id="n8n-chat-container">
+              <div className="relative h-128" id="n8n-chat-container">
                 {/* El widget de n8n se renderizará aquí */}
               </div>
             ) : (
               <>
-                <div ref={scroller} className="p-2 h-56 overflow-auto bg-gray-50">
+                <div ref={scroller} className="p-2 h-[32rem] overflow-auto bg-gray-50">
                   {messages.map((m, i) => (
                     <div key={i} className={m.role === "user" ? "text-right my-1" : "text-left my-1"}>
                       <div className={m.role === "user" ? "inline-block bg-blue-600 text-white px-3 py-1 rounded" : "inline-block bg-white px-3 py-1 rounded shadow-sm"}>

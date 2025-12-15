@@ -77,29 +77,72 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({children}) 
 
     }, [])
 
-    const register = async (username:string, email: string, password:string): Promise<{success: boolean, message: string}> => {
+    const register = async (username:string, email: string, password:string): Promise<{success: boolean, message: string, requires_verification?: boolean}> => {
         try {
-            const response = await fetch('http://localhost:5000/register', {
+            console.log('Intentando registrar:', {username, email})
+            
+            // Intentar con diferentes configuraciones de fetch
+            const fetchOptions = {
                 method: 'POST',
-                credentials: 'include',
-                headers: {'Content-Type': 'application/json'},
+                mode: 'cors' as RequestMode,
+                cache: 'no-cache' as RequestCache,
+                credentials: 'include' as RequestCredentials,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
                 body: JSON.stringify({username, email, password})
-            })
-            if (response.ok){
-                // Después de registrar exitosamente, iniciar sesión automáticamente
-                const loginResult = await login(email, password)
-                if (loginResult.success) {
-                    return {success: true, message: 'Usuario registrado con exito y sesión iniciada'}
-                } else {
-                    return {success: false, message: 'Usuario registrado pero error al iniciar sesión: ' + loginResult.message}
-                }
-            } else {
-                const data = await response.json().catch(() => null)
-                return {success: false, message: data?.error || 'Error en el registro'}
             }
+            
+            console.log('Fetch options:', fetchOptions)
+            
+            const response = await fetch('http://localhost:5000/register', fetchOptions)
+            
+            console.log('Respuesta registro status:', response.status)
+            console.log('Respuesta headers:', response.headers)
+            
+            // Manejar respuestas de error 400 y 403 correctamente
+            if (response.status === 400 || response.status === 403) {
+                const errorData = await response.json()
+                console.log(`Error ${response.status} response:`, errorData)
+                return {success: false, message: errorData.error || 'Error en el registro'}
+            }
+            
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.log('Error response text:', errorText)
+                throw new Error(`HTTP ${response.status}: ${errorText}`)
+            }
+            
+            const data = await response.json()
+            console.log('Respuesta registro data:', data)
+            
+            if (data.requires_verification) {
+                return {success: false, message: data.message, requires_verification: true}
+            }
+            
+            const loginResult = await login(email, password)
+            if (loginResult.success) {
+                return {success: true, message: 'Usuario registrado con exito y sesión iniciada'}
+            } else {
+                return {success: false, message: 'Usuario registrado pero error al iniciar sesión: ' + loginResult.message}
+            }
+            
         } catch (error) {
-            console.error('Error en el registro:', error)
-            return {success: false, message: 'Error de conexión'}
+            console.error('Error en registro:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+            
+            // Extraer solo el mensaje de error del JSON si existe
+            let cleanMessage = errorMessage
+            try {
+                const errorObj = JSON.parse(errorMessage.replace(/^[^{]+/, ''))
+                cleanMessage = errorObj.error || errorMessage
+            } catch {
+                // Si no es JSON, usar el mensaje original
+            }
+            
+            return {success: false, message: cleanMessage}
         }
     }
 

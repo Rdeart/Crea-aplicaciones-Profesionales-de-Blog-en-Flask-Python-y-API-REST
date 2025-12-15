@@ -17,6 +17,13 @@ class User(db.Model):
     photo_url = db.Column(db.Text, nullable=True)
     reset_token = db.Column(db.String(255), nullable=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
+    
+    # Nuevos campos para verificación de email
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_token = db.Column(db.String(255), nullable=True)
+    verification_token_expires = db.Column(db.DateTime, nullable=True)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
+    
     articles = db.relationship('Article', backref='author', lazy=True)
 
 

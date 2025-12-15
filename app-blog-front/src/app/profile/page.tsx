@@ -124,10 +124,15 @@ export default function ProfilePage() {
         try {
             const body: any = { first_name: firstName, last_name: lastName, area }
             if (photoDataUrl) body.photo_url = photoDataUrl
+            const token = localStorage.getItem('auth_token')
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`
+            }
             const res = await fetch('http://localhost:5000/user/profile', {
                 method: 'PUT',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(body)
             })
             if (res.ok) {
@@ -153,10 +158,15 @@ export default function ProfilePage() {
         setMessage(null)
         try {
             const body: any = { photo_url: photoDataUrl }
+            const token = localStorage.getItem('auth_token')
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`
+            }
             const res = await fetch('http://localhost:5000/user/profile', {
                 method: 'PUT',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(body)
             })
             console.log('PUT /user/profile status', res.status)

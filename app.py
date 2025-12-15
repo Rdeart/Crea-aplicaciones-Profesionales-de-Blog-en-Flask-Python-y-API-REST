@@ -75,16 +75,11 @@ def create_app():
 
     CORS(app,
         supports_credentials=True,
-        origins=[
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://192.10.2.191:3000',
-            'http://192.10.2.141:3000',
-            'http://192.10.2.160:3000',
-        ],
-        allow_headers=["Content-Type", "Authorization", "Set-Cookie"],
-        expose_headers=["Set-Cookie"],
-        methods=["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"])
+        origins=['*'],  # Permitir todos los origins en desarrollo
+        allow_headers=["Content-Type", "Authorization", "Set-Cookie", "X-Requested-With", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Access-Control-Allow-Methods"],
+        expose_headers=["Set-Cookie", "Access-Control-Allow-Origin"],
+        methods=["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"],
+        max_age=600)  # Cache preflight requests for 10 minutes
 
     with app.app_context():
         try:

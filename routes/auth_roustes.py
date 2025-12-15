@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from models import User, db
 from models.article import Article
 from services.auth_service import register_user, login_user, logout_user, get_profile, update_profile
+from services.email_verification_service import verify_email_token, resend_verification_email
 from utils.auth_decorators import login_required
 from sqlalchemy.exc import SQLAlchemyError
 import logging
@@ -128,6 +129,19 @@ def user_articles_route(user_id):
         })
     return jsonify(result), 200
 
+
+@bp.route('/verify-email', methods=['GET'])
+def verify_email_route():
+    token = request.args.get('token')
+    result, status_code = verify_email_token(token)
+    return jsonify(result), status_code
+
+@bp.route('/resend-verification', methods=['POST'])
+def resend_verification_route():
+    data = request.get_json()
+    email = data.get('email')
+    result, status_code = resend_verification_email(email)
+    return jsonify(result), status_code
 
 @bp.route('/user/<int:user_id>', methods=['GET'])
 def get_user_profile_route(user_id):

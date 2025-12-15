@@ -91,7 +91,7 @@ const ForgotPassword = () => {
                     className="w-full bg-[#0081a1] text-white py-2 rounded hover:bg-[#3caca8] disabled:opacity-50"
                     disabled={loading}
                 >
-                    {loading ? 'Enviando...' : 'Enviar Instrucciones'}
+                    {loading ? 'Enviando...' : 'Enviar'}
                 </button>
             </form>
 

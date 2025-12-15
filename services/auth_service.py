@@ -6,30 +6,19 @@ import datetime
 from config.corporate_domains import is_corporate_email
 
 def register_user(data):
-    email = data.get('email', '').lower()
-    
-    # Validar que el email sea corporativo
-    if not is_corporate_email(email):
-        return jsonify({
-            'error': 'Solo se permiten correos corporativos. Contacte al administrador para más información.'
-        }), 403
-    
-    if User.query.filter_by(email=email).first() is not None:
-        return jsonify({
-            'error': 'El email ya esta registrado'
-        }), 400
-    
-    new_user = User(username=data['username'], email=email)
-    new_user.set_password(data['password'])
-    db.session.add(new_user)
-    db.session.commit()
-    return jsonify({
-        'message': f'Usuario {new_user.username} registrado con exito'
-    }), 201
+    from services.email_verification_service import create_user_with_verification
+    return create_user_with_verification(data)
 
 def login_user(data):
     user = User.query.filter_by(email=data['email']).first()
     if user and user.check_password(data['password']):
+        # Verificar si el email está verificado
+        if not user.is_verified:
+            return jsonify({
+                'error': 'Por favor verifica tu email antes de iniciar sesión. Revisa tu bandeja de entrada.',
+                'requires_verification': True
+            }), 401
+        
         # Establecer user_id en la sesión para comentarios
         session['user_id'] = user.id
         

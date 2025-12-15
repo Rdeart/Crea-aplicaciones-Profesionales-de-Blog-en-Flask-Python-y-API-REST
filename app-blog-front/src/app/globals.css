@@ -306,4 +306,102 @@ h3 { font-size: 1.125rem; color: var(--brand-color); font-weight: var(--heading-
   
 }
 
+/* Estilos personalizados para modales de SweetAlert2 */
+.login-modal-popup {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(0, 129, 161, 0.1) !important;
+  overflow: hidden !important;
+}
+
+.login-modal-title {
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  color: #0081a1 !important;
+  margin: 0 0 1rem 0 !important;
+  padding: 1.5rem 1.5rem 0 1.5rem !important;
+  background: linear-gradient(135deg, #f8fafb 0%, #ffffff 100%) !important;
+}
+
+.login-modal-content {
+  padding: 0 1.5rem 1.5rem 1.5rem !important;
+  font-size: 1rem !important;
+  line-height: 1.6 !important;
+  color: #374151 !important;
+  text-align: center !important;
+}
+
+.login-modal-content strong {
+  color: #0081a1 !important;
+  font-weight: 600 !important;
+}
+
+/* Estilos para el botón de confirmación */
+.swal2-confirm {
+  background: linear-gradient(135deg, #0081a1 0%, #006688 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 12px 24px !important;
+  font-size: 1rem !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px rgba(0, 129, 161, 0.3) !important;
+}
+
+.swal2-confirm:hover {
+  background: linear-gradient(135deg, #006688 0%, #004d66 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(0, 129, 161, 0.4) !important;
+}
+
+/* Icono personalizado */
+.login-modal-popup .swal2-icon {
+  border: 3px solid #0081a1 !important;
+  color: #0081a1 !important;
+}
+
+.login-modal-popup .swal2-icon.swal2-info {
+  border-color: #0081a1 !important;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+}
+
+.login-modal-popup .swal2-icon.swal2-info::before {
+  color: #0081a1 !important;
+}
+
+/* Animación suave */
+@keyframes slideInUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.login-modal-popup {
+  animation: slideInUp 0.4s ease-out !important;
+}
+
+/* Responsive para móviles */
+@media (max-width: 640px) {
+  .login-modal-popup {
+    margin: 1rem !important;
+    width: calc(100% - 2rem) !important;
+    max-width: 400px !important;
+  }
+  
+  .login-modal-title {
+    font-size: 1.25rem !important;
+    padding: 1rem 1rem 0.5rem 1rem !important;
+  }
+  
+  .login-modal-content {
+    padding: 0 1rem 1rem 1rem !important;
+    font-size: 0.95rem !important;
+  }
+}
+
 /* (Opcional) Colores distintos según tipo de notificación */
